@@ -1,0 +1,30 @@
+{
+  "ts-node": {
+    "transpileOnly": true,
+
+    "files": true,
+
+    "compilerOptions": {}
+  },
+  "compilerOptions": {
+    "outDir": "dist",
+    "module": "commonjs",
+    "target": "ES2020",
+    "lib": ["ES2020"],
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "noImplicitThis": true,
+    "declaration": true,
+    "downlevelIteration": true,
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "typeRoots": ["node_modules/@types", "src/@types"]
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

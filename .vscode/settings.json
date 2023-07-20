@@ -1,0 +1,27 @@
+{
+  "editor.formatOnSave": true,
+  "editor.formatOnType": true,
+  "eslint.alwaysShowStatus": true,
+  "eslint.debug": false,
+  "eslint.format.enable": true,
+  "eslint.lintTask.enable": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": true
+  },
+  "editor.tabSize": 2,
+  "eslint.workingDirectories": [
+    {
+      "directory": "backend",
+      "changeProcessCWD": true
+    },
+    {
+      "directory": ".",
+      "changeProcessCWD": true
+    },
+    {
+      "directory": "frontend",
+      "changeProcessCWD": true
+    }
+  ]
+}
+  

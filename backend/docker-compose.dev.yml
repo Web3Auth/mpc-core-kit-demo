@@ -1,0 +1,35 @@
+version: "3"
+
+services:
+  redis:
+    restart: always
+    image: redis
+    env_file:
+      - ./.env.development
+    ports:
+      - "6379:6379"
+  mysql:
+    restart: always
+    platform: linux/x86_64
+    image: mysql:5.7
+    command:
+      - --sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION
+
+    env_file:
+      - ./.env.development
+    ports:
+      - "3306:3306"
+  sms-data-server:
+    restart: always
+    depends_on:
+      - mysql
+      - redis
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./.env.development
+    ports:
+      - "3021:3021/tcp"
+    volumes:
+      - .:/app
