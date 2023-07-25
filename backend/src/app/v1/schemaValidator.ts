@@ -15,7 +15,7 @@ const phoneNumberValidation: CustomValidator = (value: string, helper: CustomHel
 };
 
 export const validator = {
-  register: {
+  registerSms: {
     body: Joi.object({
       pubKey: Joi.object({
         x: Joi.string().required(),
@@ -34,7 +34,28 @@ export const validator = {
       address: Joi.string().required(),
     }).required(),
   },
-  verify: {
+  verifySms: {
+    body: Joi.object({
+      address: Joi.string().required(),
+      code: Joi.string().required().length(6),
+      data: Joi.object().optional(),
+    }).required(),
+  },
+  registerAuthenticator: {
+    body: Joi.object({
+      pubKey: Joi.object({
+        x: Joi.string().required(),
+        y: Joi.string().required(),
+      }).required(),
+      sig: Joi.object({
+        r: Joi.string().required(),
+        s: Joi.string().required(),
+        v: Joi.string().required(),
+      }).required(),
+      secretKey: Joi.string().required(),
+    }).required(),
+  },
+  verifyAuthenticator: {
     body: Joi.object({
       address: Joi.string().required(),
       code: Joi.string().required().length(6),

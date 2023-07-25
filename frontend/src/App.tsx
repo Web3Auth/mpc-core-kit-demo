@@ -11,6 +11,7 @@ import swal from "sweetalert";
 import Web3 from "web3";
 import type { provider } from "web3-core";
 
+import AuthenticatorService from "./authenticatorService";
 import { CustomFactorsModuleType } from "./constants";
 import SmsPasswordless from "./smsService";
 import { generateIdToken } from "./utils";
@@ -267,6 +268,114 @@ function App() {
     }
   };
 
+  const setupAuthenticatorRecovery = async (): Promise<void> => {
+    try {
+      if (!coreKitInstance) {
+        throw new Error("coreKitInstance is not set");
+      }
+      if (!coreKitInstance.tkeyPrivKey) {
+        throw new Error("user is not logged in, tkey is not reconstructed yet.");
+      }
+
+      // get the tkey address
+      const { tkeyPrivKey } = coreKitInstance;
+
+      // check if we are setting up the sms recovery for the first time.
+      // share descriptions contain the details of all the factors/ shares you set up for the user.
+      const shareDescriptions = Object.values(coreKitInstance.getKeyDetails().shareDescriptions).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
+      // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
+      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === CustomFactorsModuleType.AUTHENTICATOR);
+      if (shareDescriptionsMobile) {
+        console.log("authenticator recovery already setup");
+        uiConsole("authenticator recovery already setup");
+        return;
+      }
+
+      const secretKey = AuthenticatorService.generateSecretKey();
+      await AuthenticatorService.register(tkeyPrivKey, secretKey);
+      uiConsole("please use this secret key to enter any authenticator app like google", secretKey);
+      console.log("secret key", secretKey);
+
+      const verificationCode = await swal(
+        `Enter your authenticator code for this secret key: ${secretKey}, please enter the correct code first time :)`,
+        {
+          content: "input" as any,
+        }
+      ).then((value) => {
+        return value;
+      });
+
+      if (!verificationCode) {
+        console.error("Invalid verification code entered");
+        uiConsole("Invalid verification code entered");
+      }
+      const { pubKey } = coreKitInstance.getKeyDetails();
+      const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
+      const newBackUpFactorKey = new BN(generatePrivate());
+      await AuthenticatorService.addAuthenticatorRecovery(address, verificationCode, newBackUpFactorKey);
+
+      // setup the authenticator recovery factor key and share in tkey.
+      // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
+      // for security reasons, we do not store the secret key in tkey.
+      await coreKitInstance.addCustomShare(newBackUpFactorKey, { module: CustomFactorsModuleType.AUTHENTICATOR });
+      uiConsole("authenticator recovery setup complete");
+    } catch (error: unknown) {
+      console.error(error);
+      Sentry.captureException(error);
+      uiConsole((error as Error).message);
+    }
+  };
+
+  const recoverViaAuthenticatorApp = async (): Promise<void> => {
+    try {
+      if (!coreKitInstance) {
+        throw new Error("coreKitInstance is not set");
+      }
+
+      const keyDetails = coreKitInstance.getKeyDetails();
+      if (!keyDetails) {
+        throw new Error("keyDetails is not set");
+      }
+
+      // check if we are setting up the sms recovery for the first time.
+      // share descriptions contain the details of all the factors/ shares you set up for the user.
+      const shareDescriptions = Object.values(keyDetails.shareDescriptions).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
+      // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
+      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === CustomFactorsModuleType.AUTHENTICATOR);
+      if (!shareDescriptionsMobile) {
+        console.error("authenticator recovery not setup");
+        uiConsole("authenticator recovery not setup");
+      }
+
+      console.log("authenticator recovery already setup", shareDescriptionsMobile);
+
+      const { pubKey } = keyDetails;
+      const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
+
+      const verificationCode = await swal("Enter your authenticator code, please enter the correct code first time :)", {
+        content: "input" as any,
+      }).then((value) => {
+        return value;
+      });
+
+      if (!verificationCode) {
+        console.error("Invalid verification code entered");
+        uiConsole("Invalid verification code entered");
+      }
+
+      const backupFactorKey = await AuthenticatorService.verifyAuthenticatorRecovery(address, verificationCode);
+      if (!backupFactorKey) {
+        throw new Error("Invalid verification code entered");
+      }
+      await coreKitInstance.recoverCustomShare(backupFactorKey);
+      if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+    } catch (error: unknown) {
+      console.error(error);
+      uiConsole((error as Error).message);
+      Sentry.captureException(error);
+    }
+  };
+
   const getChainID = async () => {
     if (!web3) {
       return;
@@ -403,6 +512,9 @@ function App() {
         <button onClick={setupSmsRecovery} className="card">
           Setup SMS Recovery
         </button>
+        <button onClick={setupAuthenticatorRecovery} className="card">
+          Setup Authenticator
+        </button>
       </div>
       <h2 className="subtitle">Blockchain Calls</h2>
       <div className="flex-container">
@@ -460,6 +572,9 @@ function App() {
           <hr />
           <button onClick={recoverViaNumber} className="card">
             Recover using phone number
+          </button>
+          <button onClick={recoverViaAuthenticatorApp} className="card">
+            Recover using Authenticator
           </button>
           <button onClick={resetAccount} className="card">
             Reset Account

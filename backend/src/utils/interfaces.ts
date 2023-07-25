@@ -15,6 +15,12 @@ export interface IRegisterRequestBody {
   number: string;
 }
 
+export interface IAuthenticatorRegisterRequestBody {
+  pubKey: PointHex;
+  sig: Signature;
+  secretKey: string;
+}
+
 export interface IInitiatePasswordlessBody {
   address: string;
 }
