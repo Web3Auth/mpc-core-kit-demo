@@ -8,7 +8,15 @@ import base32 from "hi-base32";
 import { getEcCrypto } from "./utils";
 
 class AuthenticatorService {
-  readonly authenticatorUrl: string = "http://localhost:3021/api/v1";
+  readonly authenticatorUrl: string = `${process.env.REACT_APP_BACKEND_ENDPOINT}/api/v1`;
+
+  constructor() {
+    if (!process.env.REACT_APP_BACKEND_ENDPOINT) {
+      throw new Error(
+        "env REACT_APP_BACKEND_ENDPOINT is not defined. You likely don't have an .env file, use one of the example files or create one."
+      );
+    }
+  }
 
   generateSecretKey(): string {
     const key = authenticator.generateKey();
