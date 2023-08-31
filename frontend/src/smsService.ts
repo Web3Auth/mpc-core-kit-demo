@@ -6,7 +6,7 @@ import { keccak256 } from "ethereum-cryptography/keccak";
 import { getEcCrypto } from "./utils";
 
 class SmsPasswordless {
-  readonly smsbackendUrl: string = "http://localhost:3021/api/v1";
+  readonly smsbackendUrl: string = `${process.env.REACT_APP_BACKEND_ENDPOINT}/api/v1`;
 
   async registerSmsOTP(privKey: BN, number: string): Promise<string | undefined> {
     const ec = getEcCrypto();
