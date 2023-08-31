@@ -8,11 +8,25 @@ import { getEcCrypto } from "./utils";
 class SmsPasswordless {
   readonly smsbackendUrl: string = `${process.env.REACT_APP_BACKEND_ENDPOINT}/api/v1`;
 
-  async registerSmsOTP(privKey: BN, number: string): Promise<string | undefined> {
+  constructor() {
+    if (!process.env.REACT_APP_BACKEND_ENDPOINT) {
+      throw new Error(
+        "env REACT_APP_BACKEND_ENDPOINT is not defined. You likely don't have an .env file, use one of the example files or create one."
+      );
+    }
+  }
+
+  async registerSmsOTP(
+    privKey: BN,
+    number: string
+  ): Promise<string | undefined> {
     const ec = getEcCrypto();
     const privKeyPair: ec.KeyPair = ec.keyFromPrivate(privKey.toString(16, 64));
     const pubKey = privKeyPair.getPublic();
-    const sig = ec.sign(keccak256(Buffer.from(number, "utf8")), Buffer.from(privKey.toString(16, 64), "hex"));
+    const sig = ec.sign(
+      keccak256(Buffer.from(number, "utf8")),
+      Buffer.from(privKey.toString(16, 64), "hex")
+    );
 
     const data = {
       pubKey: {
@@ -35,11 +49,16 @@ class SmsPasswordless {
 
     // this is to send sms to the user instantly after registration.
     const startData = {
-      address: `${pubKey.getX().toString(16, 64)}${pubKey.getY().toString(16, 64)}`,
+      address: `${pubKey.getX().toString(16, 64)}${pubKey
+        .getY()
+        .toString(16, 64)}`,
     };
 
     // Sends the user sms.
-    const resp2 = await post<{ success: boolean; code?: string }>(`${this.smsbackendUrl}/start`, startData);
+    const resp2 = await post<{ success: boolean; code?: string }>(
+      `${this.smsbackendUrl}/start`,
+      startData
+    );
     return resp2.code;
   }
 
@@ -64,17 +83,26 @@ class SmsPasswordless {
     const startData = {
       address,
     };
-    const resp2 = await post<{ success?: boolean; code?: string }>(`${this.smsbackendUrl}/start`, startData);
+    const resp2 = await post<{ success?: boolean; code?: string }>(
+      `${this.smsbackendUrl}/start`,
+      startData
+    );
     return resp2.code;
   }
 
-  async verifySMSOTPRecovery(address: string, code: string): Promise<BN | undefined> {
+  async verifySMSOTPRecovery(
+    address: string,
+    code: string
+  ): Promise<BN | undefined> {
     const verificationData = {
       address,
       code,
     };
 
-    const response = await post<{ data?: Record<string, string> }>(`${this.smsbackendUrl}/verify`, verificationData);
+    const response = await post<{ data?: Record<string, string> }>(
+      `${this.smsbackendUrl}/verify`,
+      verificationData
+    );
     const { data } = response;
     return data ? new BN(data.factorKey, "hex") : undefined;
   }
