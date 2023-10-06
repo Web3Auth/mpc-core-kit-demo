@@ -3,7 +3,15 @@ import "./App.css";
 
 import * as Sentry from "@sentry/react";
 import type { SafeEventEmitterProvider } from "@web3auth/base";
-import { WEB3AUTH_NETWORK, Web3AuthMPCCoreKit } from "@web3auth/mpc-core-kit";
+import {
+  COREKIT_STATUS,
+  FactorKeyTypeShareDescription,
+  mnemonicToKey,
+  parseToken,
+  TssShareType,
+  WEB3AUTH_NETWORK,
+  Web3AuthMPCCoreKit,
+} from "@web3auth/mpc-core-kit";
 import BN from "bn.js";
 import { generatePrivate } from "eccrypto";
 import { useEffect, useState } from "react";
@@ -57,20 +65,21 @@ function App() {
       });
       await coreKitInstance.init();
       setCoreKitInstance(coreKitInstance);
+
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
-      if (window.location.hash.includes("#state")) {
-        try {
-          const provider = await coreKitInstance.handleRedirectResult();
-          if (provider) setProvider(provider);
-        } catch (error) {
-          if ((error as Error).message === "required more shares") {
-            setShowBackupPhraseScreen(true);
-          } else {
-            console.error(error);
-            Sentry.captureException(error);
-          }
-        }
-      }
+      // if (window.location.hash.includes("#state")) {
+      //   try {
+      //     const provider = await coreKitInstance.handleRedirectResult();
+      //     if (provider) setProvider(provider);
+      //   } catch (error) {
+      //     if ((error as Error).message === "required more shares") {
+      //       setShowBackupPhraseScreen(true);
+      //     } else {
+      //       console.error(error);
+      //       Sentry.captureException(error);
+      //     }
+      //   }
+      // }
     };
     init();
   }, []);
@@ -94,26 +103,28 @@ function App() {
       if (!coreKitInstance) {
         throw new Error("initiated to login");
       }
+
+      uiConsole("Logging in...");
+
       const token = generateIdToken(mockVerifierId as string, "ES256");
-      const verifierConfig = mockLogin
-        ? {
-            verifier: "torus-test-health",
-            typeOfLogin: "jwt" as const,
-            clientId: "torus-key-test",
-            jwtParams: {
-              verifierIdField: "email",
-              id_token: token,
-            },
-          }
-        : {
+      const parsedToken = parseToken(token);
+      if (mockLogin) {
+        await coreKitInstance.loginWithJWT({
+          verifier: "torus-test-health",
+          verifierId: parsedToken.email,
+          idToken: token,
+        });
+      } else {
+        await coreKitInstance.loginWithOauth({
+          subVerifierDetails: {
             typeOfLogin: "google" as const,
             verifier: "mpc-demo-w3a",
             clientId: "774338308167-q463s7kpvja16l4l0kko3nb925ikds2p.apps.googleusercontent.com",
-          };
-      uiConsole("Logging in...");
-      const provider = await coreKitInstance.connect({ subVerifierDetails: verifierConfig });
+          },
+        });
+      }
 
-      if (provider) setProvider(provider);
+      if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
     } catch (error: unknown) {
       if ((error as Error).message === "required more shares") {
         setShowBackupPhraseScreen(true);
@@ -148,7 +159,9 @@ function App() {
     if (!provider) {
       throw new Error("provider is not set.");
     }
-    const share = await coreKitInstance?.exportBackupShare();
+    const share = await coreKitInstance?.createFactor({
+      shareType: TssShareType.RECOVERY,
+    });
     uiConsole(share);
   };
 
@@ -156,7 +169,11 @@ function App() {
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
-    await coreKitInstance.inputBackupShare(seedPhrase);
+    if (!seedPhrase) {
+      throw new Error("seedPhrase is not set");
+    }
+    const key = mnemonicToKey(seedPhrase);
+    await coreKitInstance.inputFactorKey(new BN(key));
     uiConsole("submitted");
     if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
   };
@@ -166,12 +183,12 @@ function App() {
       if (!coreKitInstance) {
         throw new Error("coreKitInstance is not set");
       }
-      if (!coreKitInstance.tkeyPrivKey) {
+      if (!coreKitInstance.tKey.privKey) {
         throw new Error("user is not logged in, tkey is not reconstructed yet.");
       }
 
       // get the tkey address
-      const { tkeyPrivKey } = coreKitInstance;
+      const { privKey } = coreKitInstance.tKey;
 
       // check if we are setting up the sms recovery for the first time.
       // share descriptions contain the details of all the factors/ shares you set up for the user.
@@ -184,7 +201,7 @@ function App() {
         return;
       }
 
-      const result = await SmsPasswordless.registerSmsOTP(tkeyPrivKey, number);
+      const result = await SmsPasswordless.registerSmsOTP(privKey, number);
       uiConsole("please use this code to verify your phone number", result);
       console.log("otp code", result);
 
@@ -198,14 +215,23 @@ function App() {
         console.error("Invalid verification code entered");
         uiConsole("Invalid verification code entered");
       }
-      const { pubKey } = coreKitInstance.getKeyDetails();
+      const { metadataPubKey: pubKey } = coreKitInstance.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const newBackUpFactorKey = new BN(generatePrivate());
       await SmsPasswordless.addSmsRecovery(address, verificationCode, newBackUpFactorKey);
 
       // setup the sms recovery factor key and share in tkey.
       // for sms otp, we have set up a custom share/ factor with module type as "mobile_sms" defined in CustomFactorsModuleType.MOBILE_SMS in this example.
-      await coreKitInstance.addCustomShare(newBackUpFactorKey, { module: CustomFactorsModuleType.MOBILE_SMS, number });
+      await coreKitInstance.createFactor({
+        factorKey: newBackUpFactorKey,
+        shareDescription: FactorKeyTypeShareDescription.Other,
+        shareType: TssShareType.RECOVERY,
+        additionalMetadata: {
+          authenticator: "sms",
+          mobile: number,
+        },
+      });
+      // await coreKitInstance.addCustomShare(newBackUpFactorKey, { module: CustomFactorsModuleType.MOBILE_SMS, number });
       uiConsole("sms recovery setup complete");
     } catch (error: unknown) {
       console.error(error);
@@ -238,7 +264,7 @@ function App() {
       console.log("sms recovery already setup", shareDescriptionsMobile);
 
       const { number } = shareDescriptionsMobile;
-      const { pubKey } = keyDetails;
+      const { metadataPubKey: pubKey } = keyDetails;
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const result = await SmsPasswordless.requestSMSOTP(address);
       uiConsole("please use this code to verify your phone number", number, "code", result);
@@ -259,7 +285,7 @@ function App() {
       if (!backupFactorKey) {
         throw new Error("Invalid verification code entered");
       }
-      await coreKitInstance.recoverCustomShare(backupFactorKey);
+      await coreKitInstance.inputFactorKey(backupFactorKey);
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
     } catch (error: unknown) {
       console.error(error);
@@ -273,12 +299,12 @@ function App() {
       if (!coreKitInstance) {
         throw new Error("coreKitInstance is not set");
       }
-      if (!coreKitInstance.tkeyPrivKey) {
+      if (coreKitInstance.status !== COREKIT_STATUS.LOGGED_IN) {
         throw new Error("user is not logged in, tkey is not reconstructed yet.");
       }
 
       // get the tkey address
-      const { tkeyPrivKey } = coreKitInstance;
+      const { privKey } = coreKitInstance.tKey;
 
       // check if we are setting up the sms recovery for the first time.
       // share descriptions contain the details of all the factors/ shares you set up for the user.
@@ -292,7 +318,7 @@ function App() {
       }
 
       const secretKey = AuthenticatorService.generateSecretKey();
-      await AuthenticatorService.register(tkeyPrivKey, secretKey);
+      await AuthenticatorService.register(privKey, secretKey);
       uiConsole("please use this secret key to enter any authenticator app like google", secretKey);
       console.log("secret key", secretKey);
 
@@ -309,7 +335,7 @@ function App() {
         console.error("Invalid verification code entered");
         uiConsole("Invalid verification code entered");
       }
-      const { pubKey } = coreKitInstance.getKeyDetails();
+      const { metadataPubKey: pubKey } = coreKitInstance.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const newBackUpFactorKey = new BN(generatePrivate());
       await AuthenticatorService.addAuthenticatorRecovery(address, verificationCode, newBackUpFactorKey);
@@ -317,7 +343,14 @@ function App() {
       // setup the authenticator recovery factor key and share in tkey.
       // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
       // for security reasons, we do not store the secret key in tkey.
-      await coreKitInstance.addCustomShare(newBackUpFactorKey, { module: CustomFactorsModuleType.AUTHENTICATOR });
+      await coreKitInstance.createFactor({
+        factorKey: newBackUpFactorKey,
+        shareType: TssShareType.RECOVERY,
+        shareDescription: FactorKeyTypeShareDescription.Other,
+        additionalMetadata: {
+          authenticator: "authenticator",
+        },
+      });
       uiConsole("authenticator recovery setup complete");
     } catch (error: unknown) {
       console.error(error);
@@ -349,7 +382,7 @@ function App() {
 
       console.log("authenticator recovery already setup", shareDescriptionsMobile);
 
-      const { pubKey } = keyDetails;
+      const { metadataPubKey: pubKey } = keyDetails;
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
 
       const verificationCode = await swal("Enter your authenticator code, please enter the correct code first time :)", {
@@ -367,7 +400,7 @@ function App() {
       if (!backupFactorKey) {
         throw new Error("Invalid verification code entered");
       }
-      await coreKitInstance.recoverCustomShare(backupFactorKey);
+      await coreKitInstance.inputFactorKey(backupFactorKey);
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
     } catch (error: unknown) {
       console.error(error);
@@ -446,7 +479,8 @@ function App() {
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
-    await coreKitInstance.CRITICAL_resetAccount();
+
+    // await coreKitInstance.CRITICAL_resetAccount();
     uiConsole("reset");
     setLoginResponse(null);
     setProvider(null);
