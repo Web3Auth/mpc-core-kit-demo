@@ -6,6 +6,8 @@ import type { SafeEventEmitterProvider } from "@web3auth/base";
 import {
   COREKIT_STATUS,
   FactorKeyTypeShareDescription,
+  // getWebBrowserFactor,
+  keyToMnemonic,
   mnemonicToKey,
   parseToken,
   TssSecurityQuestion,
@@ -37,6 +39,7 @@ function App() {
   const [backupFactorKey, setBackupFactorKey] = useState<string | undefined>(undefined);
   const [loginResponse, setLoginResponse] = useState<any>(null);
   const [coreKitInstance, setCoreKitInstance] = useState<Web3AuthMPCCoreKit | null>(null);
+  // const [coreKitStatus, setCoreKitStatus] = useState<COREKIT_STATUS>(COREKIT_STATUS.NOT_INITIALIZED);
   const [provider, setProvider] = useState<SafeEventEmitterProvider | null>(null);
   const [web3, setWeb3] = useState<any>(null);
   const [mockVerifierId, setMockVerifierId] = useState<string | null>(null);
@@ -75,19 +78,21 @@ function App() {
       setCoreKitInstance(coreKitInstance);
 
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
-      // if (window.location.hash.includes("#state")) {
-      //   try {
-      //     const provider = await coreKitInstance.handleRedirectResult();
-      //     if (provider) setProvider(provider);
-      //   } catch (error) {
-      //     if ((error as Error).message === "required more shares") {
-      //       setShowBackupPhraseScreen(true);
-      //     } else {
-      //       console.error(error);
-      //       Sentry.captureException(error);
-      //     }
-      //   }
-      // }
+      if (coreKitInstance.status === COREKIT_STATUS.REQUIRED_SHARE) {
+        uiConsole(
+          "required more shares, please enter your backup/ device factor key, or reset account unrecoverable once reset, please use it with caution]"
+        );
+      }
+
+      // setCoreKitStatus(coreKitInstance.status);
+
+      try {
+        const result = securityQuestion.getQuestion(coreKitInstance!);
+        setQuestion(result);
+      } catch (e) {
+        setQuestion(undefined);
+        uiConsole(e);
+      }
     };
     init();
   }, []);
@@ -135,6 +140,7 @@ function App() {
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
     } catch (error: unknown) {
       if ((error as Error).message === "required more shares") {
+        console.log("required more shares");
         setShowBackupPhraseScreen(true);
       } else {
         console.error(error);
@@ -171,6 +177,22 @@ function App() {
       shareType: TssShareType.RECOVERY,
     });
     uiConsole(share);
+  };
+
+  // const getDeviceShare = async () => {
+  //   const factorKey = await getWebBrowserFactor(coreKitInstance!);
+  //   setBackupFactorKey(factorKey);
+  //   uiConsole("Device share: ", factorKey);
+  // };
+
+  const enableMFA = async () => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance is not set");
+    }
+    const factorKey = await coreKitInstance.enableMFA({});
+    const factorKeyMnemonic = await keyToMnemonic(factorKey);
+
+    uiConsole("MFA enabled, device factor stored in local store, deleted hashed cloud key, your backup factor key: ", factorKeyMnemonic);
   };
 
   const inputBackupFactorKey = async () => {
@@ -611,6 +633,12 @@ function App() {
         </button>
       </div>
       <h2 className="subtitle">Recovery/ Key Manipulation</h2>
+      <h4>Enabling MFA</h4>
+      <div className="flex-container">
+        <button onClick={enableMFA} className="card">
+          Enable MFA
+        </button>
+      </div>
       <div className="flex-container">
         <button onClick={exportShare} className="card">
           Export backup share
@@ -736,12 +764,6 @@ function App() {
             <button onClick={() => recoverSecurityQuestionFactor()} className="card">
               Recover Using Security Answer
             </button>
-          </div>
-          <button onClick={resetAccount} className="card">
-            Reset Account
-          </button>
-          <div id="console" style={{ whiteSpace: "pre-line" }}>
-            <p style={{ whiteSpace: "pre-line" }}></p>
           </div>
         </>
       )}
