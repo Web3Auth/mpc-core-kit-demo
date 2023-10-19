@@ -98,6 +98,11 @@
   width: fit-content;
 }
 
+.disabledDiv {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
 #console {
   width: 100%;
   height: 100%;

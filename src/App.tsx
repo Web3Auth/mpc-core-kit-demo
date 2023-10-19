@@ -6,7 +6,7 @@ import type { SafeEventEmitterProvider } from "@web3auth/base";
 import {
   COREKIT_STATUS,
   FactorKeyTypeShareDescription,
-  // getWebBrowserFactor,
+  getWebBrowserFactor,
   keyToMnemonic,
   mnemonicToKey,
   parseToken,
@@ -39,11 +39,10 @@ function App() {
   const [backupFactorKey, setBackupFactorKey] = useState<string | undefined>(undefined);
   const [loginResponse, setLoginResponse] = useState<any>(null);
   const [coreKitInstance, setCoreKitInstance] = useState<Web3AuthMPCCoreKit | null>(null);
-  // const [coreKitStatus, setCoreKitStatus] = useState<COREKIT_STATUS>(COREKIT_STATUS.NOT_INITIALIZED);
+  const [coreKitStatus, setCoreKitStatus] = useState<COREKIT_STATUS>(COREKIT_STATUS.NOT_INITIALIZED);
   const [provider, setProvider] = useState<SafeEventEmitterProvider | null>(null);
   const [web3, setWeb3] = useState<any>(null);
   const [mockVerifierId, setMockVerifierId] = useState<string | null>(null);
-  const [showBackupPhraseScreen, setShowBackupPhraseScreen] = useState<boolean>(false);
   const [seedPhrase, setSeedPhrase] = useState<string>("");
   const [number, setNumber] = useState<string>("");
   const [answer, setAnswer] = useState<string | undefined>(undefined);
@@ -84,7 +83,7 @@ function App() {
         );
       }
 
-      // setCoreKitStatus(coreKitInstance.status);
+      setCoreKitStatus(coreKitInstance.status);
 
       try {
         const result = securityQuestion.getQuestion(coreKitInstance!);
@@ -136,12 +135,12 @@ function App() {
           },
         });
       }
+      setCoreKitStatus(coreKitInstance.status);
 
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
     } catch (error: unknown) {
       if ((error as Error).message === "required more shares") {
         console.log("required more shares");
-        setShowBackupPhraseScreen(true);
       } else {
         console.error(error);
         Sentry.captureException(error);
@@ -179,11 +178,11 @@ function App() {
     uiConsole(share);
   };
 
-  // const getDeviceShare = async () => {
-  //   const factorKey = await getWebBrowserFactor(coreKitInstance!);
-  //   setBackupFactorKey(factorKey);
-  //   uiConsole("Device share: ", factorKey);
-  // };
+  const getDeviceShare = async () => {
+    const factorKey = await getWebBrowserFactor(coreKitInstance!);
+    setBackupFactorKey(factorKey);
+    uiConsole("Device share: ", factorKey);
+  };
 
   const enableMFA = async () => {
     if (!coreKitInstance) {
@@ -369,8 +368,7 @@ function App() {
         return;
       }
 
-      const { secretKey, qrKey } = AuthenticatorService.generateSecretKey();
-      console.log(qrKey);
+      const secretKey = AuthenticatorService.generateSecretKey();
       await AuthenticatorService.register(privKey, secretKey);
       uiConsole("please use this secret key to enter any authenticator app like google", secretKey);
       console.log("secret key", secretKey);
@@ -528,16 +526,20 @@ function App() {
     uiConsole(signedMessage);
   };
 
-  const resetAccount = async (): Promise<void> => {
+  const criticalResetAccount = async (): Promise<void> => {
+    // This is a critical function that should only be used for testing purposes
+    // Resetting your account means clearing all the metadata associated with it from the metadata server
+    // The key details will be deleted from our server and you will not be able to recover your account
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
 
-    // await coreKitInstance.CRITICAL_resetAccount();
+    await coreKitInstance.tKey.storageLayer.setMetadata({
+      privKey: new BN(coreKitInstance.metadataKey!, "hex"),
+      input: { message: "KEY_NOT_FOUND" },
+    });
     uiConsole("reset");
-    setLoginResponse(null);
     setProvider(null);
-    setShowBackupPhraseScreen(false);
   };
 
   const sendTransaction = async () => {
@@ -626,7 +628,7 @@ function App() {
           Delete local store (enables Recovery Flow)
         </button>
 
-        <button onClick={resetAccount} className="card">
+        <button onClick={criticalResetAccount} className="card">
           Reset Account
         </button>
 
@@ -730,45 +732,47 @@ function App() {
 
   const unloggedInView = (
     <>
-      {!showBackupPhraseScreen && (
-        <>
-          <button onClick={() => login(false)} className="card">
-            Login
-          </button>
-          <button onClick={() => login(true)} className="card">
-            MockLogin
-          </button>
-        </>
-      )}
+      <button onClick={() => login(false)} className="card">
+        Login
+      </button>
+      <button onClick={() => login(true)} className="card">
+        MockLogin
+      </button>
 
       <p>Mock Login Seed Email</p>
       <input value={mockVerifierId as string} onChange={(e) => setMockVerifierId(e.target.value)}></input>
 
-      {showBackupPhraseScreen && (
-        <>
-          <textarea value={seedPhrase as string} onChange={(e) => setSeedPhrase(e.target.value)}></textarea>
-          <button onClick={submitBackupShare} className="card">
-            Submit backup share
+      <div className={coreKitStatus === COREKIT_STATUS.REQUIRED_SHARE ? "" : "disabledDiv"}>
+        <textarea value={seedPhrase as string} onChange={(e) => setSeedPhrase(e.target.value)}></textarea>
+        <button onClick={submitBackupShare} className="card">
+          Submit backup share
+        </button>
+        <button onClick={() => getDeviceShare()} className="card">
+          Get Device Share
+        </button>
+        <label>Backup/ Device factor key:</label>
+        <input value={backupFactorKey} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
+        <button onClick={() => inputBackupFactorKey()} className="card">
+          Input Factor Key
+        </button>
+        <button onClick={criticalResetAccount} className="card">
+          [CRITICAL] Reset Account
+        </button>
+        <button onClick={recoverViaNumber} className="card">
+          Recover using phone number
+        </button>
+        <button onClick={recoverViaAuthenticatorApp} className="card">
+          Recover using Authenticator
+        </button>
+        <div className={!question ? "disabledDiv" : ""}>
+          <label>Recover Using Security Answer:</label>
+          <label>{question}</label>
+          <input value={answer} onChange={(e) => setAnswer(e.target.value)}></input>
+          <button onClick={() => recoverSecurityQuestionFactor()} className="card">
+            Recover Using Security Answer
           </button>
-          <hr />
-          OR
-          <hr />
-          <button onClick={recoverViaNumber} className="card">
-            Recover using phone number
-          </button>
-          <button onClick={recoverViaAuthenticatorApp} className="card">
-            Recover using Authenticator
-          </button>
-          <div className={!question ? "disabledDiv" : ""}>
-            <label>Recover Using Security Answer:</label>
-            <label>{question}</label>
-            <input value={answer} onChange={(e) => setAnswer(e.target.value)}></input>
-            <button onClick={() => recoverSecurityQuestionFactor()} className="card">
-              Recover Using Security Answer
-            </button>
-          </div>
-        </>
-      )}
+        </div>
+      </div>
     </>
   );
 
