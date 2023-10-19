@@ -245,8 +245,8 @@ function App() {
       // share descriptions contain the details of all the factors/ shares you set up for the user.
       const shareDescriptions = Object.values(coreKitInstance.getKeyDetails().shareDescriptions).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
       // for sms otp, we have set up a custom share/ factor with module type as "mobile_sms" defined in CustomFactorsModuleType.MOBILE_SMS in this example.
-      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === CustomFactorsModuleType.MOBILE_SMS);
-      if (shareDescriptionsMobile) {
+      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === FactorKeyTypeShareDescription.Other);
+      if (shareDescriptionsMobile.authenticator === "sms") {
         console.log("sms recovery already setup");
         uiConsole("sms console already setup");
         return;
@@ -361,14 +361,16 @@ function App() {
       // share descriptions contain the details of all the factors/ shares you set up for the user.
       const shareDescriptions = Object.values(coreKitInstance.getKeyDetails().shareDescriptions).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
       // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
-      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === CustomFactorsModuleType.AUTHENTICATOR);
-      if (shareDescriptionsMobile) {
+      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === FactorKeyTypeShareDescription.Other);
+
+      if (shareDescriptionsMobile.authenticator === "authenticator") {
         console.log("authenticator recovery already setup");
         uiConsole("authenticator recovery already setup");
         return;
       }
 
-      const secretKey = AuthenticatorService.generateSecretKey();
+      const { secretKey, qrKey } = AuthenticatorService.generateSecretKey();
+      console.log(qrKey);
       await AuthenticatorService.register(privKey, secretKey);
       uiConsole("please use this secret key to enter any authenticator app like google", secretKey);
       console.log("secret key", secretKey);
