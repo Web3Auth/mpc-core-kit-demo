@@ -37,6 +37,14 @@ npm run start
 
 Try running `npx prettier --write .` on your project's directory.
 
+### How to recover
+
+If you enabled MFA option after you logged in, you will need to proceed recovery logic to get your account back.
+There are couple of ways to recover the account.
+You can recover using any of the methods you used for setup.
+After successfully recover, factor Key will automatically loaded to the input field.
+Just press Input Factor Key to recover.
+
 ## Important Links
 
 - [Website](https://web3auth.io)
