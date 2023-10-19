@@ -23,7 +23,7 @@ npm run start
 
 ### Run Frontend with Local Docker Setup
 
-This setup and repo is private, [reach out to us](https://calendly.com/web3auth/meeting-with-web3auth) for access to the repo. 
+This setup and repo is private, [reach out to us](https://calendly.com/web3auth/meeting-with-web3auth) for access to the repo.
 
 Follow instructions on the backend repo before proceeding.
 
@@ -32,6 +32,10 @@ Rename .env.example.local to .env
 ```
 npm run start
 ```
+
+### To fix prettier problem
+
+Try running `npx prettier --write .` on your project's directory.
 
 ## Important Links
 

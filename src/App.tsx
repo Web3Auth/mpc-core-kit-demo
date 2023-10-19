@@ -8,6 +8,7 @@ import {
   FactorKeyTypeShareDescription,
   mnemonicToKey,
   parseToken,
+  TssSecurityQuestion,
   TssShareType,
   WEB3AUTH_NETWORK,
   Web3AuthMPCCoreKit,
@@ -33,6 +34,7 @@ const uiConsole = (...args: any[]): void => {
 };
 
 function App() {
+  const [backupFactorKey, setBackupFactorKey] = useState<string | undefined>(undefined);
   const [loginResponse, setLoginResponse] = useState<any>(null);
   const [coreKitInstance, setCoreKitInstance] = useState<Web3AuthMPCCoreKit | null>(null);
   const [provider, setProvider] = useState<SafeEventEmitterProvider | null>(null);
@@ -41,6 +43,12 @@ function App() {
   const [showBackupPhraseScreen, setShowBackupPhraseScreen] = useState<boolean>(false);
   const [seedPhrase, setSeedPhrase] = useState<string>("");
   const [number, setNumber] = useState<string>("");
+  const [answer, setAnswer] = useState<string | undefined>(undefined);
+  const [newAnswer, setNewAnswer] = useState<string | undefined>(undefined);
+  const [question, setQuestion] = useState<string | undefined>(undefined);
+  const [newQuestion, setNewQuestion] = useState<string | undefined>(undefined);
+
+  const securityQuestion: TssSecurityQuestion = new TssSecurityQuestion();
 
   useEffect(() => {
     if (!mockVerifierId) return;
@@ -163,6 +171,27 @@ function App() {
       shareType: TssShareType.RECOVERY,
     });
     uiConsole(share);
+  };
+
+  const inputBackupFactorKey = async () => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance not found");
+    }
+    if (!backupFactorKey) {
+      throw new Error("backupFactorKey not found");
+    }
+    const factorKey = new BN(backupFactorKey, "hex");
+    await coreKitInstance.inputFactorKey(factorKey);
+
+    if (coreKitInstance.status === COREKIT_STATUS.REQUIRED_SHARE) {
+      uiConsole(
+        "required more shares even after inputing backup factor key, please enter your backup/ device factor key, or reset account [unrecoverable once reset, please use it with caution]"
+      );
+    }
+
+    if (coreKitInstance.provider) {
+      setProvider(coreKitInstance.provider);
+    }
   };
 
   const submitBackupShare = async (): Promise<void> => {
@@ -507,6 +536,52 @@ function App() {
     uiConsole(receipt);
   };
 
+  // security question related logic
+
+  const recoverSecurityQuestionFactor = async () => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance not found");
+    }
+    if (!answer) {
+      throw new Error("backupFactorKey not found");
+    }
+
+    const factorKey = await securityQuestion.recoverFactor(coreKitInstance, answer);
+    setBackupFactorKey(factorKey);
+    uiConsole("Security Question share: ", factorKey);
+  };
+
+  const createSecurityQuestion = async (question: string, answer: string) => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance is not set");
+    }
+    await securityQuestion.setSecurityQuestion({ mpcCoreKit: coreKitInstance, question, answer, shareType: TssShareType.RECOVERY });
+    setNewQuestion(undefined);
+    const result = await securityQuestion.getQuestion(coreKitInstance);
+    if (result) {
+      setQuestion(question);
+    }
+  };
+
+  const changeSecurityQuestion = async (newQuestion: string, newAnswer: string, answer: string) => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance is not set");
+    }
+    await securityQuestion.changeSecurityQuestion({ mpcCoreKit: coreKitInstance, newQuestion, newAnswer, answer });
+    const result = await securityQuestion.getQuestion(coreKitInstance);
+    if (result) {
+      setQuestion(question);
+    }
+  };
+
+  const deleteSecurityQuestion = async () => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance is not set");
+    }
+    await securityQuestion.deleteSecurityQuestion(coreKitInstance);
+    setQuestion(undefined);
+  };
+
   const loggedInView = (
     <>
       <h2 className="subtitle">Account Details</h2>
@@ -541,14 +616,58 @@ function App() {
           Export backup share
         </button>
 
-        <hr />
+        <div className="flex-container">
+          <input value={backupFactorKey} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
+          <button onClick={() => inputBackupFactorKey()} className="card">
+            Input Factor Key
+          </button>
+        </div>
+      </div>
+
+      <h4>SMS OTP</h4>
+
+      <div className="flex-container">
         <input placeholder={"Enter number +{cc}-{number}"} value={number} onChange={(e) => setNumber(e.target.value)}></input>
         <button onClick={setupSmsRecovery} className="card">
           Setup SMS Recovery
         </button>
+      </div>
+
+      <h4>Authenticator</h4>
+      <div className="flex-container">
         <button onClick={setupAuthenticatorRecovery} className="card">
           Setup Authenticator
         </button>
+      </div>
+
+      <h4>Security Question</h4>
+
+      <div>{question}</div>
+      <div className="flex-container">
+        <div className={question ? " disabledDiv" : ""}>
+          <label>Set Security Question:</label>
+          <input value={question} placeholder="question" onChange={(e) => setNewQuestion(e.target.value)}></input>
+          <input value={answer} placeholder="answer" onChange={(e) => setAnswer(e.target.value)}></input>
+          <button onClick={() => createSecurityQuestion(newQuestion!, answer!)} className="card">
+            Create Security Question
+          </button>
+        </div>
+        <div className={!question ? " disabledDiv" : ""}>
+          <label>Change Security Question:</label>
+          <input value={newQuestion} placeholder="newQuestion" onChange={(e) => setNewQuestion(e.target.value)}></input>
+          <input value={newAnswer} placeholder="newAnswer" onChange={(e) => setNewAnswer(e.target.value)}></input>
+          <input value={answer} placeholder="oldAnswer" onChange={(e) => setAnswer(e.target.value)}></input>
+          <button onClick={() => changeSecurityQuestion(newQuestion!, newAnswer!, answer!)} className="card">
+            Change Security Question
+          </button>
+        </div>
+      </div>
+      <div className="flex-container">
+        <div className={!question ? "disabledDiv" : ""}>
+          <button onClick={() => deleteSecurityQuestion()} className="card">
+            Delete Security Question
+          </button>
+        </div>
       </div>
       <h2 className="subtitle">Blockchain Calls</h2>
       <div className="flex-container">
@@ -610,6 +729,14 @@ function App() {
           <button onClick={recoverViaAuthenticatorApp} className="card">
             Recover using Authenticator
           </button>
+          <div className={!question ? "disabledDiv" : ""}>
+            <label>Recover Using Security Answer:</label>
+            <label>{question}</label>
+            <input value={answer} onChange={(e) => setAnswer(e.target.value)}></input>
+            <button onClick={() => recoverSecurityQuestionFactor()} className="card">
+              Recover Using Security Answer
+            </button>
+          </div>
           <button onClick={resetAccount} className="card">
             Reset Account
           </button>
