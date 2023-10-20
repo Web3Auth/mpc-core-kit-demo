@@ -943,7 +943,7 @@ function App() {
         </button>
       </div>
       <div>
-        <input type="checkbox" checked={autoRecover} onChange={(e) => setAutoRecover(e.target.checked)}></input> <span>Contine After Recovery</span>
+        <input type="checkbox" checked={autoRecover} onChange={(e) => setAutoRecover(e.target.checked)}></input> <span>Continue After Recovery</span>
       </div>
       <div className={coreKitStatus === COREKIT_STATUS.REQUIRED_SHARE ? "" : "disabledDiv"} style={{ width: "80%" }}>
         <button onClick={() => getDeviceShare()} className="card">
