@@ -1,7 +1,8 @@
-import loader from "./spinner.svg"; // Tell webpack this JS file uses this image
+import "./Loading.css";
 
+import loader from "./spinner.svg"; // Tell webpack this JS file uses this image
 const Loading = () => (
-  <div style={{ textAlign: "center" }}>
+  <div className="loadingWrapper">
     <img src={loader} height="200px" alt="Loading" />
   </div>
 );

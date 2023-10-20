@@ -10,6 +10,7 @@ import {
   keyToMnemonic,
   // mnemonicToKey,
   parseToken,
+  Point,
   TssSecurityQuestion,
   TssShareType,
   WEB3AUTH_NETWORK,
@@ -47,7 +48,7 @@ function App() {
   const [number, setNumber] = useState<string>("");
   const [answer, setAnswer] = useState<string | undefined>(undefined);
   const [newAnswer, setNewAnswer] = useState<string | undefined>(undefined);
-  const [question, setQuestion] = useState<string | undefined>(undefined);
+  const [question, setQuestion] = useState<string | undefined>("");
   const [newQuestion, setNewQuestion] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [autoRecover, setAutoRecover] = useState(false);
@@ -132,6 +133,13 @@ function App() {
       setCoreKitStatus(coreKitInstance.status);
 
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+
+      try {
+        const question = await securityQuestion.getQuestion(coreKitInstance);
+        if (question) {
+          setQuestion(question);
+        }
+      } catch {}
     } catch (error: unknown) {
       if ((error as Error).message === "required more shares") {
         console.log("required more shares");
@@ -334,6 +342,7 @@ function App() {
         return;
       }
 
+      setIsLoading(true);
       console.log("sms recovery already setup", shareDescriptionsMobile);
 
       const { number } = shareDescriptionsMobile;
@@ -353,14 +362,18 @@ function App() {
         console.error("Invalid verification code entered");
         uiConsole("Invalid verification code entered");
       }
-      setIsLoading(true);
 
       const backupFactorKey = await SmsPasswordless.verifySMSOTPRecovery(address, verificationCode);
       if (!backupFactorKey) {
         throw new Error("Invalid verification code entered");
       }
-      await coreKitInstance.inputFactorKey(backupFactorKey);
-      if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+      if (autoRecover) {
+        await coreKitInstance.inputFactorKey(backupFactorKey);
+        if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+      } else {
+        setBackupFactorKey(backupFactorKey.toString("hex"));
+        uiConsole("Authenticator App share: ", backupFactorKey.toString("hex"));
+      }
     } catch (error: unknown) {
       console.error(error);
       if ((error as any).ok === false) {
@@ -498,10 +511,13 @@ function App() {
         throw new Error("Invalid verification code entered");
       }
 
-      await coreKitInstance.inputFactorKey(backupFactorKey);
-      setBackupFactorKey(backupFactorKey.toString("hex"));
-
-      if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+      if (autoRecover) {
+        await coreKitInstance.inputFactorKey(backupFactorKey);
+        if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+      } else {
+        setBackupFactorKey(backupFactorKey.toString("hex"));
+        uiConsole("Authenticator App share: ", backupFactorKey.toString("hex"));
+      }
     } catch (error: unknown) {
       console.error(error);
       if ((error as any).ok === false) {
@@ -700,6 +716,21 @@ function App() {
     setIsLoading(false);
   };
 
+  const getFactorPublicKeys = async () => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance is not set");
+    }
+    const publicKeys = await coreKitInstance.tKey.metadata.factorPubs;
+    if (!publicKeys) {
+      throw new Error("publicKeys not found");
+    }
+    const publicKeyCompress = publicKeys[coreKitInstance.tKey.tssTag].map((i) => {
+      const point = Point.fromTkeyPoint(i);
+      return point.toBufferSEC1(true).toString("hex");
+    });
+    uiConsole(publicKeyCompress);
+  };
+
   const loggedInView = (
     <>
       <h2 className="subtitle">Account Details</h2>
@@ -724,6 +755,9 @@ function App() {
           Reset Account
         </button>
 
+        <button onClick={getFactorPublicKeys} className="card">
+          Get Factor Public Keys
+        </button>
         <button onClick={logout} className="card">
           Log Out
         </button>
@@ -751,7 +785,7 @@ function App() {
       <h4>SMS OTP</h4>
 
       <div className="flex-container">
-        <input placeholder={"Enter number +{cc}-{number}"} value={number} onChange={(e) => setNumber(e.target.value)}></input>
+        <input placeholder={"Enter number +{cc}-{number}"} value={number || ""} onChange={(e) => setNumber(e.target.value)}></input>
         <button onClick={setupSmsRecovery} className="card">
           Setup SMS Recovery
         </button>
@@ -770,8 +804,8 @@ function App() {
       <div className="flex-container">
         <div className={question ? " disabledDiv" : ""}>
           <label>Set Security Question:</label>
-          <input value={question} placeholder="question" onChange={(e) => setNewQuestion(e.target.value)}></input>
-          <input value={answer} placeholder="answer" onChange={(e) => setAnswer(e.target.value)}></input>
+          <input value={question || ""} placeholder="question" onChange={(e) => setNewQuestion(e.target.value)}></input>
+          <input value={answer || ""} placeholder="answer" onChange={(e) => setAnswer(e.target.value)}></input>
           <button onClick={() => createSecurityQuestion(newQuestion!, answer!)} className="card">
             Create Security Question
           </button>
@@ -824,20 +858,20 @@ function App() {
 
   const unloggedInView = (
     <>
-      <div>
-        <input type="checkbox" checked={autoRecover} onChange={(e) => setAutoRecover(e.target.checked)}></input> <span>Auto Recover</span>
-      </div>
       <div style={{ width: "80%" }}>
         <button onClick={() => login(false)} className="card">
           Login
         </button>
         <div className="centerFlex">
           <p>Mock Login Seed Email</p>
-          <input value={mockVerifierId as string} onChange={(e) => setMockVerifierId(e.target.value)}></input>
+          <input value={(mockVerifierId as string) || ""} onChange={(e) => setMockVerifierId(e.target.value)}></input>
         </div>
         <button onClick={() => login(true)} className="card">
           MockLogin
         </button>
+      </div>
+      <div>
+        <input type="checkbox" checked={autoRecover} onChange={(e) => setAutoRecover(e.target.checked)}></input> <span>Contine After Recovery</span>
       </div>
       <div className={coreKitStatus === COREKIT_STATUS.REQUIRED_SHARE ? "" : "disabledDiv"} style={{ width: "80%" }}>
         <button onClick={() => getDeviceShare()} className="card">
@@ -861,10 +895,10 @@ function App() {
 
         <div className="centerFlex">
           <p>Backup/ Device factor key:</p>
-          <input value={backupFactorKey} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
+          <input value={backupFactorKey || ""} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
         </div>
 
-        <button onClick={() => inputBackupFactorKey()} className="card">
+        <button onClick={() => inputBackupFactorKey()} className={`card ${backupFactorKey ? "" : "disabledDiv"}`} disabled={!backupFactorKey}>
           Input Factor Key
         </button>
 
@@ -882,25 +916,27 @@ function App() {
     </>
   );
 
-  return isLoading ? (
-    <Loading />
-  ) : (
-    <div className="container">
-      <h1 className="title">
-        <a target="_blank" href="https://web3auth.io/docs/guides/mpc" rel="noreferrer">
-          Web3Auth Core Kit tKey MPC Beta
-        </a>{" "}
-        & ReactJS Ethereum Example
-      </h1>
+  return (
+    <>
+      <div className="container">
+        <h1 className="title">
+          <a target="_blank" href="https://web3auth.io/docs/guides/mpc" rel="noreferrer">
+            Web3Auth Core Kit tKey MPC Beta
+          </a>{" "}
+          & ReactJS Ethereum Example
+        </h1>
 
-      <div className="grid">{provider ? loggedInView : unloggedInView}</div>
+        <div className="grid">{provider ? loggedInView : unloggedInView}</div>
 
-      <footer className="footer">
-        <a href="https://github.com/Web3Auth/mpc-core-kit-demo" target="_blank" rel="noopener noreferrer">
-          Source code
-        </a>
-      </footer>
-    </div>
+        <footer className="footer">
+          <a href="https://github.com/Web3Auth/mpc-core-kit-demo" target="_blank" rel="noopener noreferrer">
+            Source code
+          </a>
+        </footer>
+      </div>
+
+      {isLoading && <Loading />}
+    </>
   );
 }
 
