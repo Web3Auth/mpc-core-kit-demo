@@ -217,7 +217,13 @@ function App() {
 
   const getDeviceShare = async () => {
     const factorKey = await getWebBrowserFactor(coreKitInstance!);
-    setBackupFactorKey(factorKey);
+    if (autoRecover) {
+      await coreKitInstance?.inputFactorKey(new BN(factorKey!, "hex"));
+      if (coreKitInstance?.provider) setProvider(coreKitInstance.provider);
+    } else {
+      setBackupFactorKey(factorKey);
+      uiConsole("Device share: ", factorKey);
+    }
     uiConsole("Device share: ", factorKey);
   };
 
@@ -959,14 +965,14 @@ function App() {
       </div>
       <div className={coreKitStatus === COREKIT_STATUS.REQUIRED_SHARE ? "" : "disabledDiv"} style={{ width: "80%" }}>
         <button onClick={() => getDeviceShare()} className="card">
-          Get Device Share
+          Recover using Device Share
         </button>
 
         <button onClick={recoverViaNumber} className="card">
-          Recover using phone number
+          Recover using Phone Number
         </button>
         <button onClick={recoverViaAuthenticatorApp} className="card">
-          Recover using Authenticator
+          Recover using Authenticator App
         </button>
         <div className={!question ? "" : ""}>
           {/* <label>Recover Using Security Answer:</label>
