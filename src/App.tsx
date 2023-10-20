@@ -8,7 +8,7 @@ import {
   FactorKeyTypeShareDescription,
   getWebBrowserFactor,
   keyToMnemonic,
-  mnemonicToKey,
+  // mnemonicToKey,
   parseToken,
   TssSecurityQuestion,
   TssShareType,
@@ -23,7 +23,6 @@ import Web3 from "web3";
 import type { provider } from "web3-core";
 
 import AuthenticatorService from "./authenticatorService";
-import { CustomFactorsModuleType } from "./constants";
 import Loading from "./Loading";
 import SmsPasswordless from "./smsService";
 import { generateIdToken } from "./utils";
@@ -163,6 +162,7 @@ function App() {
     setProvider(null);
     setLoginResponse(null);
     await coreKitInstance.init();
+    window.location.reload();
   };
 
   const getUserInfo = (): void => {
@@ -229,11 +229,14 @@ function App() {
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
-    if (!seedPhrase) {
+    if (!backupFactorKey) {
       throw new Error("seedPhrase is not set");
     }
-    const key = mnemonicToKey(seedPhrase);
-    await coreKitInstance.inputFactorKey(new BN(key));
+    // const key = mnemonicToKey(seedPhrase);
+    // const key = seedPhrase;
+    const key = backupFactorKey || "";
+    console.log(backupFactorKey, "hex");
+    await coreKitInstance.inputFactorKey(new BN(key, "hex"));
     uiConsole("submitted");
     if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
   };
@@ -319,25 +322,31 @@ function App() {
         throw new Error("coreKitInstance is not set");
       }
 
-      const keyDetails = coreKitInstance.getKeyDetails();
-      if (!keyDetails) {
+      if (coreKitInstance.status === COREKIT_STATUS.NOT_INITIALIZED) {
+        throw new Error("user is not logged in, ");
+      }
+
+      const shareDescriptionDetails = coreKitInstance.tKey.metadata.getShareDescription();
+      if (!shareDescriptionDetails) {
         throw new Error("keyDetails is not set");
       }
 
       // check if we are setting up the sms recovery for the first time.
       // share descriptions contain the details of all the factors/ shares you set up for the user.
-      const shareDescriptions = Object.values(keyDetails.shareDescriptions).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
+      const shareDescriptions = Object.values(shareDescriptionDetails).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
       // for sms otp, we have set up a custom share/ factor with module type as "mobile_sms" defined in CustomFactorsModuleType.MOBILE_SMS in this example.
-      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === CustomFactorsModuleType.MOBILE_SMS);
+      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.authenticator === "sms");
       if (!shareDescriptionsMobile) {
+        console.log(shareDescriptions);
         console.error("sms recovery not setup");
         uiConsole("sms recovery not setup");
+        return;
       }
 
       console.log("sms recovery already setup", shareDescriptionsMobile);
 
       const { number } = shareDescriptionsMobile;
-      const { metadataPubKey: pubKey } = keyDetails;
+      const { pubKey } = coreKitInstance.tKey.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const result = await SmsPasswordless.requestSMSOTP(address);
       uiConsole("please use this code to verify your phone number", number, "code", result);
@@ -419,7 +428,7 @@ function App() {
       }
       setIsLoading(true);
 
-      const { metadataPubKey: pubKey } = coreKitInstance.getKeyDetails();
+      const { pubKey } = coreKitInstance.tKey.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const newBackUpFactorKey = new BN(generatePrivate());
       await AuthenticatorService.addAuthenticatorRecovery(address, verificationCode, newBackUpFactorKey);
@@ -456,24 +465,29 @@ function App() {
         throw new Error("coreKitInstance is not set");
       }
 
-      const keyDetails = coreKitInstance.getKeyDetails();
-      if (!keyDetails) {
+      if (coreKitInstance.status === COREKIT_STATUS.NOT_INITIALIZED) {
+        throw new Error("user is not logged in, ");
+      }
+
+      const shareDescriptionDetails = coreKitInstance.tKey.metadata.getShareDescription();
+      if (!shareDescriptionDetails) {
         throw new Error("keyDetails is not set");
       }
 
       // check if we are setting up the sms recovery for the first time.
       // share descriptions contain the details of all the factors/ shares you set up for the user.
-      const shareDescriptions = Object.values(keyDetails.shareDescriptions).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
+      const shareDescriptions = Object.values(shareDescriptionDetails).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
       // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
-      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === CustomFactorsModuleType.AUTHENTICATOR);
+      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.authenticator === "authenticator");
       if (!shareDescriptionsMobile) {
         console.error("authenticator recovery not setup");
         uiConsole("authenticator recovery not setup");
+        return;
       }
 
       console.log("authenticator recovery already setup", shareDescriptionsMobile);
 
-      const { metadataPubKey: pubKey } = keyDetails;
+      const { pubKey } = coreKitInstance.tKey.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
 
       const verificationCode = await swal("Enter your authenticator code, please enter the correct code first time :)", {
