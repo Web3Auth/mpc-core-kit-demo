@@ -49,6 +49,7 @@ function App() {
   const [answer, setAnswer] = useState<string | undefined>(undefined);
   const [newAnswer, setNewAnswer] = useState<string | undefined>(undefined);
   const [question, setQuestion] = useState<string | undefined>("");
+  const [questionInput, setQuestionInput] = useState<string>("");
   const [newQuestion, setNewQuestion] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [autoRecover, setAutoRecover] = useState(false);
@@ -88,6 +89,16 @@ function App() {
       }
 
       setCoreKitStatus(coreKitInstance.status);
+
+      try {
+        if (coreKitInstance.status === COREKIT_STATUS.LOGGED_IN) {
+          const question = await securityQuestion.getQuestion(coreKitInstance);
+          console.log(question);
+          if (question) {
+            setQuestion(question);
+          }
+        }
+      } catch {}
     };
     init();
   }, []);
@@ -137,6 +148,7 @@ function App() {
 
       try {
         const question = await securityQuestion.getQuestion(coreKitInstance);
+        console.log(question);
         if (question) {
           setQuestion(question);
         }
@@ -876,9 +888,9 @@ function App() {
       <div className="flex-container">
         <div className={question ? " disabledDiv" : ""}>
           <label>Set Security Question:</label>
-          <input value={question} placeholder="question" onChange={(e) => setNewQuestion(e.target.value)}></input>
+          <input value={questionInput} placeholder="question" onChange={(e) => setQuestionInput(e.target.value)}></input>
           <input value={answer} placeholder="answer" onChange={(e) => setAnswer(e.target.value)}></input>
-          <button onClick={() => createSecurityQuestion(newQuestion!, answer!)} className="card">
+          <button onClick={() => createSecurityQuestion(questionInput, answer!)} className="card">
             Create Security Question
           </button>
         </div>
