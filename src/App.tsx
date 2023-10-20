@@ -36,7 +36,7 @@ const uiConsole = (...args: any[]): void => {
 };
 
 function App() {
-  const [backupFactorKey, setBackupFactorKey] = useState<string | undefined>(undefined);
+  const [backupFactorKey, setBackupFactorKey] = useState<string | undefined>("");
   const [loginResponse, setLoginResponse] = useState<any>(null);
   const [coreKitInstance, setCoreKitInstance] = useState<Web3AuthMPCCoreKit | null>(null);
   const [coreKitStatus, setCoreKitStatus] = useState<COREKIT_STATUS>(COREKIT_STATUS.NOT_INITIALIZED);
@@ -50,6 +50,7 @@ function App() {
   const [question, setQuestion] = useState<string | undefined>(undefined);
   const [newQuestion, setNewQuestion] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
+  const [autoRecover, setAutoRecover] = useState(false);
 
   const securityQuestion: TssSecurityQuestion = new TssSecurityQuestion();
 
@@ -85,14 +86,6 @@ function App() {
       }
 
       setCoreKitStatus(coreKitInstance.status);
-
-      try {
-        const result = securityQuestion.getQuestion(coreKitInstance!);
-        setQuestion(result);
-      } catch (e) {
-        setQuestion(undefined);
-        uiConsole(e);
-      }
     };
     init();
   }, []);
@@ -112,7 +105,6 @@ function App() {
   };
 
   const login = async (mockLogin: boolean) => {
-    setIsLoading(true);
     try {
       if (!coreKitInstance) {
         throw new Error("initiated to login");
@@ -140,7 +132,6 @@ function App() {
       setCoreKitStatus(coreKitInstance.status);
 
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
-      setIsLoading(false);
     } catch (error: unknown) {
       if ((error as Error).message === "required more shares") {
         console.log("required more shares");
@@ -191,10 +182,10 @@ function App() {
   };
 
   const enableMFA = async () => {
-    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
+    setIsLoading(true);
     const factorKey = await coreKitInstance.enableMFA({});
     const factorKeyMnemonic = await keyToMnemonic(factorKey);
 
@@ -297,7 +288,6 @@ function App() {
           mobile: number,
         },
       });
-      setIsLoading(false);
       // await coreKitInstance.addCustomShare(newBackUpFactorKey, { module: CustomFactorsModuleType.MOBILE_SMS, number });
       uiConsole("sms recovery setup complete");
     } catch (error: unknown) {
@@ -314,6 +304,7 @@ function App() {
         uiConsole(error as Error);
       }
     }
+    setIsLoading(false);
   };
 
   const recoverViaNumber = async (): Promise<void> => {
@@ -370,7 +361,6 @@ function App() {
       }
       await coreKitInstance.inputFactorKey(backupFactorKey);
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
-      setIsLoading(false);
     } catch (error: unknown) {
       console.error(error);
       if ((error as any).ok === false) {
@@ -382,6 +372,7 @@ function App() {
         uiConsole(error as Error);
       }
     }
+    setIsLoading(false);
   };
 
   const setupAuthenticatorRecovery = async (): Promise<void> => {
@@ -444,7 +435,6 @@ function App() {
           authenticator: "authenticator",
         },
       });
-      setIsLoading(false);
       uiConsole("authenticator recovery setup complete");
     } catch (error: unknown) {
       console.error(error);
@@ -457,6 +447,7 @@ function App() {
         uiConsole(error as Error);
       }
     }
+    setIsLoading(false);
   };
 
   const recoverViaAuthenticatorApp = async (): Promise<void> => {
@@ -506,9 +497,11 @@ function App() {
       if (!backupFactorKey) {
         throw new Error("Invalid verification code entered");
       }
+
       await coreKitInstance.inputFactorKey(backupFactorKey);
+      setBackupFactorKey(backupFactorKey.toString("hex"));
+
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
-      setIsLoading(false);
     } catch (error: unknown) {
       console.error(error);
       if ((error as any).ok === false) {
@@ -520,6 +513,7 @@ function App() {
         uiConsole(error as Error);
       }
     }
+    setIsLoading(false);
   };
 
   const getChainID = async () => {
@@ -633,54 +627,76 @@ function App() {
   // security question related logic
 
   const recoverSecurityQuestionFactor = async () => {
-    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance not found");
     }
-    if (!answer) {
-      throw new Error("backupFactorKey not found");
-    }
 
-    const factorKey = await securityQuestion.recoverFactor(coreKitInstance, answer);
-    setBackupFactorKey(factorKey);
+    try {
+      const result = securityQuestion.getQuestion(coreKitInstance);
+      setQuestion(result);
+
+      const answer = await swal(`${result}`, {
+        content: "input" as any,
+      }).then((value) => {
+        return value;
+      });
+
+      setIsLoading(true);
+      const factorKey = await securityQuestion.recoverFactor(coreKitInstance, answer);
+      if (autoRecover) {
+        await coreKitInstance.inputFactorKey(new BN(factorKey));
+        if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+      } else {
+        setBackupFactorKey(factorKey);
+        uiConsole("Security Question share: ", factorKey);
+      }
+    } catch (e) {
+      setQuestion(undefined);
+      uiConsole(e);
+    }
     setIsLoading(false);
-    uiConsole("Security Question share: ", factorKey);
   };
 
   const createSecurityQuestion = async (question: string, answer: string) => {
-    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
-    await securityQuestion.setSecurityQuestion({ mpcCoreKit: coreKitInstance, question, answer, shareType: TssShareType.RECOVERY });
-    setNewQuestion(undefined);
-    const result = await securityQuestion.getQuestion(coreKitInstance);
-    if (result) {
-      setQuestion(question);
-    }
+    setIsLoading(true);
+    try {
+      await securityQuestion.setSecurityQuestion({ mpcCoreKit: coreKitInstance, question, answer, shareType: TssShareType.RECOVERY });
+      setNewQuestion(undefined);
+      const result = await securityQuestion.getQuestion(coreKitInstance);
+      if (result) {
+        setQuestion(question);
+      }
+    } catch (e) {}
     setIsLoading(false);
   };
 
   const changeSecurityQuestion = async (newQuestion: string, newAnswer: string, answer: string) => {
-    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
-    await securityQuestion.changeSecurityQuestion({ mpcCoreKit: coreKitInstance, newQuestion, newAnswer, answer });
-    const result = await securityQuestion.getQuestion(coreKitInstance);
-    if (result) {
-      setQuestion(question);
-    }
+    setIsLoading(true);
+    try {
+      await securityQuestion.changeSecurityQuestion({ mpcCoreKit: coreKitInstance, newQuestion, newAnswer, answer });
+      const result = await securityQuestion.getQuestion(coreKitInstance);
+      if (result) {
+        setQuestion(question);
+      }
+    } catch (e) {}
     setIsLoading(false);
   };
 
   const deleteSecurityQuestion = async () => {
-    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
-    await securityQuestion.deleteSecurityQuestion(coreKitInstance);
-    setQuestion(undefined);
+    setIsLoading(true);
+    try {
+      await securityQuestion.deleteSecurityQuestion(coreKitInstance);
+      setQuestion(undefined);
+    } catch (e) {}
     setIsLoading(false);
   };
 
@@ -725,7 +741,7 @@ function App() {
         </button>
 
         <div className="flex-container">
-          <input value={backupFactorKey} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
+          <input value={backupFactorKey || ""} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
           <button onClick={() => inputBackupFactorKey()} className="card">
             Input Factor Key
           </button>
@@ -808,44 +824,58 @@ function App() {
 
   const unloggedInView = (
     <>
-      <button onClick={() => login(false)} className="card">
-        Login
-      </button>
-      <button onClick={() => login(true)} className="card">
-        MockLogin
-      </button>
-
-      <p>Mock Login Seed Email</p>
-      <input value={mockVerifierId as string} onChange={(e) => setMockVerifierId(e.target.value)}></input>
-
-      <div className={coreKitStatus === COREKIT_STATUS.REQUIRED_SHARE ? "" : "disabledDiv"}>
-        <textarea value={seedPhrase as string} onChange={(e) => setSeedPhrase(e.target.value)}></textarea>
-        <button onClick={submitBackupShare} className="card">
-          Submit backup share
+      <div>
+        <input type="checkbox" checked={autoRecover} onChange={(e) => setAutoRecover(e.target.checked)}></input> <span>Auto Recover</span>
+      </div>
+      <div style={{ width: "80%" }}>
+        <button onClick={() => login(false)} className="card">
+          Login
         </button>
+        <div className="centerFlex">
+          <p>Mock Login Seed Email</p>
+          <input value={mockVerifierId as string} onChange={(e) => setMockVerifierId(e.target.value)}></input>
+        </div>
+        <button onClick={() => login(true)} className="card">
+          MockLogin
+        </button>
+      </div>
+      <div className={coreKitStatus === COREKIT_STATUS.REQUIRED_SHARE ? "" : "disabledDiv"} style={{ width: "80%" }}>
         <button onClick={() => getDeviceShare()} className="card">
           Get Device Share
         </button>
-        <label>Backup/ Device factor key:</label>
-        <input value={backupFactorKey} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
-        <button onClick={() => inputBackupFactorKey()} className="card">
-          Input Factor Key
-        </button>
-        <button onClick={criticalResetAccount} className="card">
-          [CRITICAL] Reset Account
-        </button>
+
         <button onClick={recoverViaNumber} className="card">
           Recover using phone number
         </button>
         <button onClick={recoverViaAuthenticatorApp} className="card">
           Recover using Authenticator
         </button>
-        <div className={!question ? "disabledDiv" : ""}>
-          <label>Recover Using Security Answer:</label>
-          <label>{question}</label>
-          <input value={answer} onChange={(e) => setAnswer(e.target.value)}></input>
+        <div className={!question ? "" : ""}>
+          {/* <label>Recover Using Security Answer:</label>
+          <label>{question}</label> */}
+          {/* <input value={answer} onChange={(e) => setAnswer(e.target.value)}></input> */}
           <button onClick={() => recoverSecurityQuestionFactor()} className="card">
             Recover Using Security Answer
+          </button>
+        </div>
+
+        <div className="centerFlex">
+          <p>Backup/ Device factor key:</p>
+          <input value={backupFactorKey} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
+        </div>
+
+        <button onClick={() => inputBackupFactorKey()} className="card">
+          Input Factor Key
+        </button>
+
+        <button onClick={criticalResetAccount} className="card">
+          [CRITICAL] Reset Account
+        </button>
+
+        <div className="disabledDiv" style={{ visibility: "hidden" }}>
+          <textarea value={seedPhrase as string} onChange={(e) => setSeedPhrase(e.target.value)}></textarea>
+          <button onClick={submitBackupShare} className="card">
+            Submit backup share
           </button>
         </div>
       </div>
