@@ -631,13 +631,17 @@ function App() {
     // Submit transaction to the blockchain and wait for it to be mined
     setIsLoading(true);
     uiConsole("Sending transaction...");
-    const receipt = await web3.eth.sendTransaction({
-      from: fromAddress,
-      to: destination,
-      value: amount,
-    });
+    try {
+      const receipt = await web3.eth.sendTransaction({
+        from: fromAddress,
+        to: destination,
+        value: amount,
+      });
+      uiConsole(receipt);
+    } catch (e) {
+      uiConsole(e);
+    }
     setIsLoading(false);
-    uiConsole(receipt);
   };
 
   // security question related logic
@@ -685,9 +689,11 @@ function App() {
       if (result) {
         setQuestion(question);
       }
-    } catch (e) {}
+      uiConsole("Security Question created");
+    } catch (e) {
+      uiConsole(e);
+    }
     setIsLoading(false);
-    uiConsole("Security Question created");
   };
 
   const changeSecurityQuestion = async (newQuestion: string, newAnswer: string, answer: string) => {
@@ -701,9 +707,11 @@ function App() {
       if (result) {
         setQuestion(question);
       }
-    } catch (e) {}
+      uiConsole("Security Question changed");
+    } catch (e) {
+      uiConsole(e);
+    }
     setIsLoading(false);
-    uiConsole("Security Question changed");
   };
 
   const deleteSecurityQuestion = async () => {
@@ -714,9 +722,11 @@ function App() {
     try {
       await securityQuestion.deleteSecurityQuestion(coreKitInstance);
       setQuestion(undefined);
-    } catch (e) {}
+      uiConsole("Security Question deleted");
+    } catch (e) {
+      uiConsole(e);
+    }
     setIsLoading(false);
-    uiConsole("Security Question deleted");
   };
 
   const getFactorPublicKeys = async () => {
