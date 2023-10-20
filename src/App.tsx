@@ -24,6 +24,7 @@ import type { provider } from "web3-core";
 
 import AuthenticatorService from "./authenticatorService";
 import { CustomFactorsModuleType } from "./constants";
+import Loader from "./Loader";
 import SmsPasswordless from "./smsService";
 import { generateIdToken } from "./utils";
 
@@ -49,6 +50,7 @@ function App() {
   const [newAnswer, setNewAnswer] = useState<string | undefined>(undefined);
   const [question, setQuestion] = useState<string | undefined>(undefined);
   const [newQuestion, setNewQuestion] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(false);
 
   const securityQuestion: TssSecurityQuestion = new TssSecurityQuestion();
 
@@ -111,6 +113,7 @@ function App() {
   };
 
   const login = async (mockLogin: boolean) => {
+    setIsLoading(true);
     try {
       if (!coreKitInstance) {
         throw new Error("initiated to login");
@@ -138,12 +141,15 @@ function App() {
       setCoreKitStatus(coreKitInstance.status);
 
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+      setIsLoading(false);
     } catch (error: unknown) {
       if ((error as Error).message === "required more shares") {
         console.log("required more shares");
+        setIsLoading(false);
       } else {
         console.error(error);
         Sentry.captureException(error);
+        setIsLoading(false);
       }
     }
   };
@@ -185,12 +191,14 @@ function App() {
   };
 
   const enableMFA = async () => {
+    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
     const factorKey = await coreKitInstance.enableMFA({});
     const factorKeyMnemonic = await keyToMnemonic(factorKey);
 
+    setIsLoading(false);
     uiConsole("MFA enabled, device factor stored in local store, deleted hashed cloud key, your backup factor key: ", factorKeyMnemonic);
   };
 
@@ -202,6 +210,7 @@ function App() {
       throw new Error("backupFactorKey not found");
     }
     const factorKey = new BN(backupFactorKey, "hex");
+    setIsLoading(true);
     await coreKitInstance.inputFactorKey(factorKey);
 
     if (coreKitInstance.status === COREKIT_STATUS.REQUIRED_SHARE) {
@@ -213,6 +222,7 @@ function App() {
     if (coreKitInstance.provider) {
       setProvider(coreKitInstance.provider);
     }
+    setIsLoading(false);
   };
 
   const submitBackupShare = async (): Promise<void> => {
@@ -265,6 +275,7 @@ function App() {
         console.error("Invalid verification code entered");
         uiConsole("Invalid verification code entered");
       }
+      setIsLoading(true);
       const { metadataPubKey: pubKey } = coreKitInstance.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const newBackUpFactorKey = new BN(generatePrivate());
@@ -281,6 +292,7 @@ function App() {
           mobile: number,
         },
       });
+      setIsLoading(false);
       // await coreKitInstance.addCustomShare(newBackUpFactorKey, { module: CustomFactorsModuleType.MOBILE_SMS, number });
       uiConsole("sms recovery setup complete");
     } catch (error: unknown) {
@@ -330,6 +342,7 @@ function App() {
         console.error("Invalid verification code entered");
         uiConsole("Invalid verification code entered");
       }
+      setIsLoading(true);
 
       const backupFactorKey = await SmsPasswordless.verifySMSOTPRecovery(address, verificationCode);
       if (!backupFactorKey) {
@@ -337,6 +350,7 @@ function App() {
       }
       await coreKitInstance.inputFactorKey(backupFactorKey);
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+      setIsLoading(false);
     } catch (error: unknown) {
       console.error(error);
       uiConsole((error as Error).message);
@@ -386,6 +400,8 @@ function App() {
         console.error("Invalid verification code entered");
         uiConsole("Invalid verification code entered");
       }
+      setIsLoading(true);
+
       const { metadataPubKey: pubKey } = coreKitInstance.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const newBackUpFactorKey = new BN(generatePrivate());
@@ -402,6 +418,7 @@ function App() {
           authenticator: "authenticator",
         },
       });
+      setIsLoading(false);
       uiConsole("authenticator recovery setup complete");
     } catch (error: unknown) {
       console.error(error);
@@ -446,6 +463,7 @@ function App() {
         console.error("Invalid verification code entered");
         uiConsole("Invalid verification code entered");
       }
+      setIsLoading(true);
 
       const backupFactorKey = await AuthenticatorService.verifyAuthenticatorRecovery(address, verificationCode);
       if (!backupFactorKey) {
@@ -453,6 +471,7 @@ function App() {
       }
       await coreKitInstance.inputFactorKey(backupFactorKey);
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
+      setIsLoading(false);
     } catch (error: unknown) {
       console.error(error);
       uiConsole((error as Error).message);
@@ -776,7 +795,11 @@ function App() {
     </>
   );
 
-  return (
+  return isLoading ? (
+    <div className="centerFlex">
+      <Loader></Loader>
+    </div>
+  ) : (
     <div className="container">
       <h1 className="title">
         <a target="_blank" href="https://web3auth.io/docs/guides/mpc" rel="noreferrer">
