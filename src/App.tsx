@@ -236,7 +236,9 @@ function App() {
       if (!coreKitInstance.tKey.privKey) {
         throw new Error("user is not logged in, tkey is not reconstructed yet.");
       }
-
+      if (!number || number.startsWith("+") === false) {
+        throw new Error("number is not set with fromat +{cc}-{number}");
+      }
       // get the tkey address
       const { privKey } = coreKitInstance.tKey;
 
@@ -244,8 +246,8 @@ function App() {
       // share descriptions contain the details of all the factors/ shares you set up for the user.
       const shareDescriptions = Object.values(coreKitInstance.getKeyDetails().shareDescriptions).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
       // for sms otp, we have set up a custom share/ factor with module type as "mobile_sms" defined in CustomFactorsModuleType.MOBILE_SMS in this example.
-      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === FactorKeyTypeShareDescription.Other);
-      if (shareDescriptionsMobile.authenticator === "sms") {
+      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.authenticator === "sms");
+      if (shareDescriptionsMobile?.authenticator === "sms") {
         console.log("sms recovery already setup");
         uiConsole("sms console already setup");
         return;
@@ -285,8 +287,17 @@ function App() {
       uiConsole("sms recovery setup complete");
     } catch (error: unknown) {
       console.error(error);
-      Sentry.captureException(error);
-      uiConsole((error as Error).message);
+
+      if ((error as any).message) {
+        uiConsole((error as any).message);
+      } else if ((error as any).ok === false) {
+        const errorBody = await (error as any).json();
+        Sentry.captureException(errorBody);
+        uiConsole(errorBody);
+      } else {
+        Sentry.captureException(error);
+        uiConsole(error as Error);
+      }
     }
   };
 
@@ -339,8 +350,14 @@ function App() {
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
     } catch (error: unknown) {
       console.error(error);
-      uiConsole((error as Error).message);
-      Sentry.captureException(error);
+      if ((error as any).ok === false) {
+        const errorBody = await (error as any).json();
+        Sentry.captureException(errorBody);
+        uiConsole(errorBody);
+      } else {
+        Sentry.captureException(error);
+        uiConsole(error as Error);
+      }
     }
   };
 
@@ -360,9 +377,9 @@ function App() {
       // share descriptions contain the details of all the factors/ shares you set up for the user.
       const shareDescriptions = Object.values(coreKitInstance.getKeyDetails().shareDescriptions).map((i) => ((i || [])[0] ? JSON.parse(i[0]) : {}));
       // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
-      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.module === FactorKeyTypeShareDescription.Other);
 
-      if (shareDescriptionsMobile.authenticator === "authenticator") {
+      const shareDescriptionsMobile = shareDescriptions.find((shareDescription) => shareDescription.authenticator === "authenticator");
+      if (shareDescriptionsMobile?.authenticator === "authenticator") {
         console.log("authenticator recovery already setup");
         uiConsole("authenticator recovery already setup");
         return;
@@ -405,8 +422,14 @@ function App() {
       uiConsole("authenticator recovery setup complete");
     } catch (error: unknown) {
       console.error(error);
-      Sentry.captureException(error);
-      uiConsole((error as Error).message);
+      if ((error as any).ok === false) {
+        const errorBody = await (error as any).json();
+        Sentry.captureException(errorBody);
+        uiConsole(errorBody);
+      } else {
+        Sentry.captureException(error);
+        uiConsole(error as Error);
+      }
     }
   };
 
@@ -455,8 +478,14 @@ function App() {
       if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
     } catch (error: unknown) {
       console.error(error);
-      uiConsole((error as Error).message);
-      Sentry.captureException(error);
+      if ((error as any).ok === false) {
+        const errorBody = await (error as any).json();
+        Sentry.captureException(errorBody);
+        uiConsole(errorBody);
+      } else {
+        Sentry.captureException(error);
+        uiConsole(error as Error);
+      }
     }
   };
 
