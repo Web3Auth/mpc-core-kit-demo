@@ -668,7 +668,7 @@ function App() {
       }
     } catch (e) {
       setQuestion(undefined);
-      uiConsole(e);
+      uiConsole("Security Question not setup");
     }
     setIsLoading(false);
   };
@@ -687,6 +687,7 @@ function App() {
       }
     } catch (e) {}
     setIsLoading(false);
+    uiConsole("Security Question created");
   };
 
   const changeSecurityQuestion = async (newQuestion: string, newAnswer: string, answer: string) => {
@@ -702,6 +703,7 @@ function App() {
       }
     } catch (e) {}
     setIsLoading(false);
+    uiConsole("Security Question changed");
   };
 
   const deleteSecurityQuestion = async () => {
@@ -714,6 +716,7 @@ function App() {
       setQuestion(undefined);
     } catch (e) {}
     setIsLoading(false);
+    uiConsole("Security Question deleted");
   };
 
   const getFactorPublicKeys = async () => {
@@ -912,6 +915,9 @@ function App() {
             Submit backup share
           </button>
         </div>
+      </div>
+      <div id="console" style={{ whiteSpace: "pre-line" }}>
+        <p style={{ whiteSpace: "pre-line" }}></p>
       </div>
     </>
   );
