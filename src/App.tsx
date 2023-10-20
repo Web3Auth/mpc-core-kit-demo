@@ -24,7 +24,7 @@ import type { provider } from "web3-core";
 
 import AuthenticatorService from "./authenticatorService";
 import { CustomFactorsModuleType } from "./constants";
-import Loader from "./Loader";
+import Loading from "./Loading";
 import SmsPasswordless from "./smsService";
 import { generateIdToken } from "./utils";
 
@@ -565,6 +565,7 @@ function App() {
     ];
     const params = [originalMessage, fromAddress];
     const method = "eth_signTypedData";
+    setIsLoading(true);
     const signedMessage = await (web3.currentProvider as any)?.sendAsync({
       id: 1,
       method,
@@ -572,9 +573,11 @@ function App() {
       fromAddress,
     });
     uiConsole(signedMessage);
+    setIsLoading(false);
   };
 
   const criticalResetAccount = async (): Promise<void> => {
+    setIsLoading(true);
     // This is a critical function that should only be used for testing purposes
     // Resetting your account means clearing all the metadata associated with it from the metadata server
     // The key details will be deleted from our server and you will not be able to recover your account
@@ -588,6 +591,7 @@ function App() {
     });
     uiConsole("reset");
     setProvider(null);
+    setIsLoading(false);
   };
 
   const sendTransaction = async () => {
@@ -601,18 +605,21 @@ function App() {
     const amount = web3.utils.toWei("0.0001"); // Convert 1 ether to wei
 
     // Submit transaction to the blockchain and wait for it to be mined
+    setIsLoading(true);
     uiConsole("Sending transaction...");
     const receipt = await web3.eth.sendTransaction({
       from: fromAddress,
       to: destination,
       value: amount,
     });
+    setIsLoading(false);
     uiConsole(receipt);
   };
 
   // security question related logic
 
   const recoverSecurityQuestionFactor = async () => {
+    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance not found");
     }
@@ -622,10 +629,12 @@ function App() {
 
     const factorKey = await securityQuestion.recoverFactor(coreKitInstance, answer);
     setBackupFactorKey(factorKey);
+    setIsLoading(false);
     uiConsole("Security Question share: ", factorKey);
   };
 
   const createSecurityQuestion = async (question: string, answer: string) => {
+    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
@@ -635,9 +644,11 @@ function App() {
     if (result) {
       setQuestion(question);
     }
+    setIsLoading(false);
   };
 
   const changeSecurityQuestion = async (newQuestion: string, newAnswer: string, answer: string) => {
+    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
@@ -646,14 +657,17 @@ function App() {
     if (result) {
       setQuestion(question);
     }
+    setIsLoading(false);
   };
 
   const deleteSecurityQuestion = async () => {
+    setIsLoading(true);
     if (!coreKitInstance) {
       throw new Error("coreKitInstance is not set");
     }
     await securityQuestion.deleteSecurityQuestion(coreKitInstance);
     setQuestion(undefined);
+    setIsLoading(false);
   };
 
   const loggedInView = (
@@ -825,9 +839,7 @@ function App() {
   );
 
   return isLoading ? (
-    <div className="centerFlex">
-      <Loader></Loader>
-    </div>
+    <Loading />
   ) : (
     <div className="container">
       <h1 className="title">
