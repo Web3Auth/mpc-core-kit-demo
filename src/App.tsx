@@ -38,7 +38,7 @@ const uiConsole = (...args: any[]): void => {
 
 function App() {
   const [backupFactorKey, setBackupFactorKey] = useState<string | undefined>("");
-  const [loginResponse, setLoginResponse] = useState<any>(null);
+  // const [loginResponse, setLoginResponse] = useState<any>(null);
   const [coreKitInstance, setCoreKitInstance] = useState<Web3AuthMPCCoreKit | null>(null);
   const [coreKitStatus, setCoreKitStatus] = useState<COREKIT_STATUS>(COREKIT_STATUS.NOT_INITIALIZED);
   const [provider, setProvider] = useState<SafeEventEmitterProvider | null>(null);
@@ -154,15 +154,18 @@ function App() {
         }
       } catch {}
     } catch (error: unknown) {
-      if ((error as Error).message === "required more shares") {
+      if ((error as Error).message) {
         console.log("required more shares");
+        uiConsole((error as Error).message);
         setIsLoading(false);
       } else {
         console.error(error);
+        uiConsole(error);
         Sentry.captureException(error);
         setIsLoading(false);
       }
     }
+    setIsLoading(false);
   };
 
   const logout = async () => {
@@ -172,7 +175,7 @@ function App() {
     await coreKitInstance.logout();
     uiConsole("Log out");
     setProvider(null);
-    setLoginResponse(null);
+    // setLoginResponse(null);
     await coreKitInstance.init();
     window.location.reload();
   };
@@ -182,9 +185,9 @@ function App() {
     uiConsole(user);
   };
 
-  const getLoginResponse = (): void => {
-    uiConsole(loginResponse);
-  };
+  // const getLoginResponse = (): void => {
+  //   uiConsole(loginResponse);
+  // };
 
   const exportShare = async (): Promise<void> => {
     if (!provider) {
@@ -818,9 +821,9 @@ function App() {
           Get User Info
         </button>
 
-        <button onClick={getLoginResponse} className="card">
+        {/* <button onClick={getLoginResponse} className="card">
           See Login Response
-        </button>
+        </button> */}
 
         <button onClick={keyDetails} className="card">
           Key Details
