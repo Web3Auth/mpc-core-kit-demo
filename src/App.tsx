@@ -8,6 +8,7 @@ import {
   FactorKeyTypeShareDescription,
   getWebBrowserFactor,
   keyToMnemonic,
+  mnemonicToKey,
   // mnemonicToKey,
   parseToken,
   Point,
@@ -206,16 +207,28 @@ function App() {
         uiConsole(error);
       }
     }
+    setIsLoading(false);
   };
 
   const deleteFactor = async (): Promise<void> => {
-    if (!coreKitInstance) {
-      throw new Error("coreKitInstance is not set");
+    setIsLoading(true);
+    try {
+      if (!coreKitInstance) {
+        throw new Error("coreKitInstance is not set");
+      }
+
+      const pubBuffer = Buffer.from(factorPubToDelete, "hex");
+      const pub = Point.fromBufferSEC1(pubBuffer);
+      await coreKitInstance.deleteFactor(pub.toTkeyPoint());
+      uiConsole("factor deleted");
+    } catch (error: unknown) {
+      if ((error as Error).message) {
+        uiConsole((error as Error).message);
+      } else {
+        uiConsole(error);
+      }
     }
-    const pubBuffer = Buffer.from(factorPubToDelete, "hex");
-    const pub = Point.fromBufferSEC1(pubBuffer);
-    await coreKitInstance.deleteFactor(pub.toTkeyPoint());
-    uiConsole("factor deleted");
+    setIsLoading(false);
   };
 
   const getDeviceShare = async () => {
@@ -235,11 +248,18 @@ function App() {
       throw new Error("coreKitInstance is not set");
     }
     setIsLoading(true);
-    const factorKey = await coreKitInstance.enableMFA({});
-    const factorKeyMnemonic = await keyToMnemonic(factorKey);
-
+    try {
+      const factorKey = await coreKitInstance.enableMFA({});
+      const factorKeyMnemonic = await keyToMnemonic(factorKey);
+      uiConsole("MFA enabled, device factor stored in local store, deleted hashed cloud key, your backup factor key: ", factorKeyMnemonic);
+    } catch (error: unknown) {
+      if ((error as Error).message) {
+        uiConsole((error as Error).message);
+      } else {
+        uiConsole(error);
+      }
+    }
     setIsLoading(false);
-    uiConsole("MFA enabled, device factor stored in local store, deleted hashed cloud key, your backup factor key: ", factorKeyMnemonic);
   };
 
   const inputBackupFactorKey = async () => {
@@ -250,7 +270,14 @@ function App() {
       if (!backupFactorKey) {
         throw new Error("backupFactorKey not found");
       }
-      const factorKey = new BN(backupFactorKey, "hex");
+      let factorKey: BN;
+      try {
+        factorKey = new BN(mnemonicToKey(backupFactorKey), "hex");
+      } catch {
+        factorKey = new BN(backupFactorKey, "hex");
+      }
+
+      // const factorKey = new BN(backupFactorKey, "hex");
       setIsLoading(true);
       await coreKitInstance.inputFactorKey(factorKey);
 
