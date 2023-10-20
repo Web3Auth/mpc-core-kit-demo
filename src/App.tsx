@@ -52,6 +52,7 @@ function App() {
   const [newQuestion, setNewQuestion] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [autoRecover, setAutoRecover] = useState(false);
+  const [factorPubToDelete, setFactorPubToDelete] = useState<string>("");
 
   const securityQuestion: TssSecurityQuestion = new TssSecurityQuestion();
 
@@ -177,10 +178,29 @@ function App() {
     if (!provider) {
       throw new Error("provider is not set.");
     }
-    const share = await coreKitInstance?.createFactor({
-      shareType: TssShareType.RECOVERY,
-    });
-    uiConsole(share);
+    setIsLoading(true);
+    try {
+      const share = await coreKitInstance?.createFactor({
+        shareType: TssShareType.RECOVERY,
+      });
+      uiConsole(share);
+    } catch (error: unknown) {
+      if ((error as Error).message) {
+        uiConsole((error as Error).message);
+      } else {
+        uiConsole(error);
+      }
+    }
+  };
+
+  const deleteFactor = async (): Promise<void> => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance is not set");
+    }
+    const pubBuffer = Buffer.from(factorPubToDelete, "hex");
+    const pub = Point.fromBufferSEC1(pubBuffer);
+    await coreKitInstance.deleteFactor(pub.toTkeyPoint());
+    uiConsole("factor deleted");
   };
 
   const getDeviceShare = async () => {
@@ -202,24 +222,32 @@ function App() {
   };
 
   const inputBackupFactorKey = async () => {
-    if (!coreKitInstance) {
-      throw new Error("coreKitInstance not found");
-    }
-    if (!backupFactorKey) {
-      throw new Error("backupFactorKey not found");
-    }
-    const factorKey = new BN(backupFactorKey, "hex");
-    setIsLoading(true);
-    await coreKitInstance.inputFactorKey(factorKey);
+    try {
+      if (!coreKitInstance) {
+        throw new Error("coreKitInstance not found");
+      }
+      if (!backupFactorKey) {
+        throw new Error("backupFactorKey not found");
+      }
+      const factorKey = new BN(backupFactorKey, "hex");
+      setIsLoading(true);
+      await coreKitInstance.inputFactorKey(factorKey);
 
-    if (coreKitInstance.status === COREKIT_STATUS.REQUIRED_SHARE) {
-      uiConsole(
-        "required more shares even after inputing backup factor key, please enter your backup/ device factor key, or reset account [unrecoverable once reset, please use it with caution]"
-      );
-    }
+      if (coreKitInstance.status === COREKIT_STATUS.REQUIRED_SHARE) {
+        uiConsole(
+          "required more shares even after inputing backup factor key, please enter your backup/ device factor key, or reset account [unrecoverable once reset, please use it with caution]"
+        );
+      }
 
-    if (coreKitInstance.provider) {
-      setProvider(coreKitInstance.provider);
+      if (coreKitInstance.provider) {
+        setProvider(coreKitInstance.provider);
+      }
+    } catch (error: unknown) {
+      if ((error as Error).message) {
+        uiConsole((error as Error).message);
+      } else {
+        uiConsole(error);
+      }
     }
     setIsLoading(false);
   };
@@ -451,7 +479,9 @@ function App() {
       uiConsole("authenticator recovery setup complete");
     } catch (error: unknown) {
       console.error(error);
-      if ((error as any).ok === false) {
+      if ((error as any).message) {
+        uiConsole((error as any).message);
+      } else if ((error as any).ok === false) {
         const errorBody = await (error as any).json();
         Sentry.captureException(errorBody);
         uiConsole(errorBody);
@@ -683,6 +713,9 @@ function App() {
     }
     setIsLoading(true);
     try {
+      if (!question || !answer) {
+        throw new Error("question or answer is not set");
+      }
       await securityQuestion.setSecurityQuestion({ mpcCoreKit: coreKitInstance, question, answer, shareType: TssShareType.RECOVERY });
       setNewQuestion(undefined);
       const result = await securityQuestion.getQuestion(coreKitInstance);
@@ -691,7 +724,11 @@ function App() {
       }
       uiConsole("Security Question created");
     } catch (e) {
-      uiConsole(e);
+      if ((e as any).message) {
+        uiConsole((e as any).message);
+      } else {
+        uiConsole(e);
+      }
     }
     setIsLoading(false);
   };
@@ -702,6 +739,9 @@ function App() {
     }
     setIsLoading(true);
     try {
+      if (!newQuestion || !newAnswer || !answer) {
+        throw new Error("newQuestion, newAnswer or answer is not set");
+      }
       await securityQuestion.changeSecurityQuestion({ mpcCoreKit: coreKitInstance, newQuestion, newAnswer, answer });
       const result = await securityQuestion.getQuestion(coreKitInstance);
       if (result) {
@@ -709,7 +749,11 @@ function App() {
       }
       uiConsole("Security Question changed");
     } catch (e) {
-      uiConsole(e);
+      if ((e as any).message) {
+        uiConsole((e as any).message);
+      } else {
+        uiConsole(e);
+      }
     }
     setIsLoading(false);
   };
@@ -724,7 +768,11 @@ function App() {
       setQuestion(undefined);
       uiConsole("Security Question deleted");
     } catch (e) {
-      uiConsole(e);
+      if ((e as any).message) {
+        uiConsole((e as any).message);
+      } else {
+        uiConsole(e);
+      }
     }
     setIsLoading(false);
   };
@@ -782,15 +830,26 @@ function App() {
           Enable MFA
         </button>
       </div>
-      <div className="flex-container">
-        <button onClick={exportShare} className="card">
-          Export backup share
-        </button>
+
+      <div>
+        <div className="flex-container">
+          <button onClick={exportShare} className="card">
+            Export backup share
+          </button>
+        </div>
 
         <div className="flex-container">
+          <label>Factor Key:</label>
           <input value={backupFactorKey || ""} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
           <button onClick={() => inputBackupFactorKey()} className="card">
             Input Factor Key
+          </button>
+        </div>
+        <div className="flex-container">
+          <label>Factor pub:</label>
+          <input value={factorPubToDelete} onChange={(e) => setFactorPubToDelete(e.target.value)}></input>
+          <button onClick={deleteFactor} className="card">
+            Delete Factor
           </button>
         </div>
       </div>
@@ -817,8 +876,8 @@ function App() {
       <div className="flex-container">
         <div className={question ? " disabledDiv" : ""}>
           <label>Set Security Question:</label>
-          <input value={question || ""} placeholder="question" onChange={(e) => setNewQuestion(e.target.value)}></input>
-          <input value={answer || ""} placeholder="answer" onChange={(e) => setAnswer(e.target.value)}></input>
+          <input value={question} placeholder="question" onChange={(e) => setNewQuestion(e.target.value)}></input>
+          <input value={answer} placeholder="answer" onChange={(e) => setAnswer(e.target.value)}></input>
           <button onClick={() => createSecurityQuestion(newQuestion!, answer!)} className="card">
             Create Security Question
           </button>
