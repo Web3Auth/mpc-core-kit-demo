@@ -619,10 +619,10 @@ function App() {
     return chainId;
   };
 
-  const deleteLocalStore = () => {
-    localStorage.removeItem("corekit_store");
-    uiConsole("local tkey share deleted, pls logout.");
-  };
+  // const deleteLocalStore = () => {
+  //   localStorage.removeItem("corekit_store");
+  //   uiConsole("local tkey share deleted, pls logout.");
+  // };
 
   const getAccounts = async () => {
     if (!web3) {
@@ -842,136 +842,145 @@ function App() {
 
   const loggedInView = (
     <>
-      <h2 className="subtitle">Account Details</h2>
-      <div className="flex-container">
-        <button onClick={getUserInfo} className="card">
-          Get User Info
-        </button>
+      <div className="flex-cont">
+        <div className="flex-child">
+          <h2 className="subtitle">Account Details</h2>
+          <div className="flex-container">
+            <button onClick={getUserInfo} className="card">
+              Get User Info
+            </button>
 
-        {/* <button onClick={getLoginResponse} className="card">
+            {/* <button onClick={getLoginResponse} className="card">
           See Login Response
         </button> */}
 
-        <button onClick={keyDetails} className="card">
-          Key Details
-        </button>
+            <button onClick={keyDetails} className="card">
+              Key Details
+            </button>
 
-        <button onClick={deleteLocalStore} className="card">
-          Delete local store (enables Recovery Flow)
-        </button>
+            {/* <button onClick={deleteLocalStore} className="card">
+              Delete local store (enables Recovery Flow)
+            </button> */}
 
-        <button onClick={criticalResetAccount} className="card">
-          Reset Account
-        </button>
+            <button onClick={criticalResetAccount} className="card">
+              Reset Account (CAUTION)
+            </button>
 
-        <button onClick={getFactorPublicKeys} className="card">
-          Get Factor Public Keys
-        </button>
-        <button onClick={logout} className="card">
-          Log Out
-        </button>
-      </div>
-      <h2 className="subtitle">Recovery/ Key Manipulation</h2>
-      <h4>Enabling MFA</h4>
-      <div className="flex-container">
-        <button onClick={enableMFA} className="card">
-          Enable MFA
-        </button>
-      </div>
+            <button onClick={getFactorPublicKeys} className="card">
+              Get Factor Public Keys
+            </button>
+            <button onClick={logout} className="card">
+              Log Out
+            </button>
+          </div>
+          <h2 className="subtitle">Recovery/ Key Manipulation</h2>
+          <h4>Enabling MFA</h4>
+          <div className="flex-container">
+            <button onClick={enableMFA} className="card">
+              Enable MFA (this will enable recovery flow)
+            </button>
+          </div>
 
-      <div>
-        <div className="flex-container">
-          <button onClick={exportShare} className="card">
-            Export backup share
-          </button>
+          <div>
+            <h4>Export</h4>
+            <div className="flex-container">
+              <button onClick={exportShare} className="card">
+                Export backup share
+              </button>
+            </div>
+
+            <div className="flex-container hide">
+              <label>Factor Key:</label>
+              <input value={backupFactorKey || ""} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
+              <button onClick={() => inputBackupFactorKey()} className="card">
+                Input Factor Key
+              </button>
+            </div>
+            <div className="flex-container hide">
+              <label>Factor pub:</label>
+              <input value={factorPubToDelete} onChange={(e) => setFactorPubToDelete(e.target.value)}></input>
+              <button onClick={deleteFactor} className="card">
+                Delete Factor
+              </button>
+            </div>
+          </div>
+
+          <h4>SMS OTP (Mocked)</h4>
+
+          <div className="flex-container">
+            <input placeholder={"Enter number +{cc}-{number}"} value={number || ""} onChange={(e) => setNumber(e.target.value)}></input>
+            <button onClick={setupSmsRecovery} className="card">
+              Setup SMS Recovery
+            </button>
+          </div>
+
+          <h4>Authenticator</h4>
+          <div className="flex-container">
+            <button onClick={setupAuthenticatorRecovery} className="card">
+              Setup Authenticator
+            </button>
+          </div>
+
+          <h4>Security Question</h4>
+
+          {/* <div>{question}</div> */}
+          <div className="flex-container">
+            <div className={question ? " disabledDiv" : ""}>
+              <p>Set Security Question</p>
+              <input value={questionInput} placeholder="question" onChange={(e) => setQuestionInput(e.target.value)}></input>
+              <input value={answer} placeholder="answer" onChange={(e) => setAnswer(e.target.value)}></input>
+              <button onClick={() => createSecurityQuestion(questionInput, answer!)} className="card">
+                Create Security Question
+              </button>
+            </div>
+            <div className={!question ? " disabledDiv" : ""}>
+              <p>Change Security Question</p>
+
+              <div>
+                <input value={newQuestion} placeholder="newQuestion" onChange={(e) => setNewQuestion(e.target.value)}></input>
+                <input value={newAnswer} placeholder="newAnswer" onChange={(e) => setNewAnswer(e.target.value)}></input>
+                <input value={answer} placeholder="oldAnswer" onChange={(e) => setAnswer(e.target.value)}></input>
+              </div>
+              <button onClick={() => changeSecurityQuestion(newQuestion!, newAnswer!, answer!)} className="card">
+                Change Security Question
+              </button>
+            </div>
+          </div>
+          <div className="flex-container">
+            <div className={!question ? "disabledDiv" : ""}>
+              <button onClick={() => deleteSecurityQuestion()} className="card">
+                Delete Security Question
+              </button>
+            </div>
+          </div>
+          <h2 className="subtitle">Blockchain Calls</h2>
+          <div className="flex-container">
+            <button onClick={getChainID} className="card">
+              Get Chain ID
+            </button>
+
+            <button onClick={getAccounts} className="card">
+              Get Accounts
+            </button>
+
+            <button onClick={getBalance} className="card">
+              Get Balance
+            </button>
+
+            <button onClick={signMessage} className="card">
+              Sign Message
+            </button>
+
+            <button onClick={sendTransaction} className="card">
+              Send Transaction
+            </button>
+          </div>
         </div>
-
-        <div className="flex-container">
-          <label>Factor Key:</label>
-          <input value={backupFactorKey || ""} onChange={(e) => setBackupFactorKey(e.target.value)}></input>
-          <button onClick={() => inputBackupFactorKey()} className="card">
-            Input Factor Key
-          </button>
+        <div className="flex-child">
+          <div id="console" style={{ whiteSpace: "pre-line" }}>
+            <p style={{ whiteSpace: "pre-line" }}></p>
+          </div>
         </div>
-        <div className="flex-container">
-          <label>Factor pub:</label>
-          <input value={factorPubToDelete} onChange={(e) => setFactorPubToDelete(e.target.value)}></input>
-          <button onClick={deleteFactor} className="card">
-            Delete Factor
-          </button>
-        </div>
-      </div>
-
-      <h4>SMS OTP</h4>
-
-      <div className="flex-container">
-        <input placeholder={"Enter number +{cc}-{number}"} value={number || ""} onChange={(e) => setNumber(e.target.value)}></input>
-        <button onClick={setupSmsRecovery} className="card">
-          Setup SMS Recovery
-        </button>
-      </div>
-
-      <h4>Authenticator</h4>
-      <div className="flex-container">
-        <button onClick={setupAuthenticatorRecovery} className="card">
-          Setup Authenticator
-        </button>
-      </div>
-
-      <h4>Security Question</h4>
-
-      <div>{question}</div>
-      <div className="flex-container">
-        <div className={question ? " disabledDiv" : ""}>
-          <label>Set Security Question:</label>
-          <input value={questionInput} placeholder="question" onChange={(e) => setQuestionInput(e.target.value)}></input>
-          <input value={answer} placeholder="answer" onChange={(e) => setAnswer(e.target.value)}></input>
-          <button onClick={() => createSecurityQuestion(questionInput, answer!)} className="card">
-            Create Security Question
-          </button>
-        </div>
-        <div className={!question ? " disabledDiv" : ""}>
-          <label>Change Security Question:</label>
-          <input value={newQuestion} placeholder="newQuestion" onChange={(e) => setNewQuestion(e.target.value)}></input>
-          <input value={newAnswer} placeholder="newAnswer" onChange={(e) => setNewAnswer(e.target.value)}></input>
-          <input value={answer} placeholder="oldAnswer" onChange={(e) => setAnswer(e.target.value)}></input>
-          <button onClick={() => changeSecurityQuestion(newQuestion!, newAnswer!, answer!)} className="card">
-            Change Security Question
-          </button>
-        </div>
-      </div>
-      <div className="flex-container">
-        <div className={!question ? "disabledDiv" : ""}>
-          <button onClick={() => deleteSecurityQuestion()} className="card">
-            Delete Security Question
-          </button>
-        </div>
-      </div>
-      <h2 className="subtitle">Blockchain Calls</h2>
-      <div className="flex-container">
-        <button onClick={getChainID} className="card">
-          Get Chain ID
-        </button>
-
-        <button onClick={getAccounts} className="card">
-          Get Accounts
-        </button>
-
-        <button onClick={getBalance} className="card">
-          Get Balance
-        </button>
-
-        <button onClick={signMessage} className="card">
-          Sign Message
-        </button>
-
-        <button onClick={sendTransaction} className="card">
-          Send Transaction
-        </button>
-      </div>
-
-      <div id="console" style={{ whiteSpace: "pre-line" }}>
-        <p style={{ whiteSpace: "pre-line" }}></p>
       </div>
     </>
   );
