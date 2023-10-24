@@ -742,7 +742,7 @@ function App() {
       setIsLoading(true);
       const factorKey = await securityQuestion.recoverFactor(coreKitInstance, answer);
       if (autoRecover) {
-        await coreKitInstance.inputFactorKey(new BN(factorKey));
+        await coreKitInstance.inputFactorKey(new BN(factorKey, "hex"));
         if (coreKitInstance.provider) setProvider(coreKitInstance.provider);
       } else {
         setBackupFactorKey(factorKey);
