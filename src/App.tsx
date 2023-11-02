@@ -29,6 +29,8 @@ import type { provider } from "web3-core";
 import Loading from "./Loading";
 import { generateIdToken } from "./utils";
 
+const authBackendUrl = process.env.REACT_APP_AUTHORIZATION_BACKEND_ENDPOINT || "";
+const smsBackendUrl = process.env.REACT_APP_SMS_BACKEND_ENDPOINT || "";
 const uiConsole = (...args: any[]): void => {
   const el = document.querySelector("#console>p");
   if (el) {
@@ -341,7 +343,7 @@ function App() {
         return;
       }
       const smsInstance = new SmsService({
-        backendUrl: "http://localhost:3021",
+        backendUrl: smsBackendUrl,
         coreKitInstance,
       });
 
@@ -426,7 +428,7 @@ function App() {
       console.log("sms recovery already setup", shareDescriptionsMobile);
 
       const smsInstance = new SmsService({
-        backendUrl: "http://localhost:3021",
+        backendUrl: smsBackendUrl,
         coreKitInstance,
       });
 
@@ -484,7 +486,7 @@ function App() {
     const instance = coreKitInstance;
 
     const smsInstance = new SmsService({
-      backendUrl: "http://localhost:3021",
+      backendUrl: smsBackendUrl,
       coreKitInstance: instance,
     });
 
@@ -551,7 +553,7 @@ function App() {
       }
 
       const authenticatorInstance = new AuthenticatorService({
-        backendUrl: "http://localhost:3021",
+        backendUrl: smsBackendUrl,
         coreKitInstance,
       });
 
@@ -652,7 +654,7 @@ function App() {
       setIsLoading(true);
 
       const authenticatorInstance = new AuthenticatorService({
-        backendUrl: "http://localhost:3021",
+        backendUrl: authBackendUrl,
         coreKitInstance,
       });
       const backupFactorKey = await authenticatorInstance.verifyAuthenticatorRecovery(address, verificationCode);
@@ -692,7 +694,7 @@ function App() {
     const instance = coreKitInstance;
 
     const authenticatorInstance = new AuthenticatorService({
-      backendUrl: "http://localhost:3021",
+      backendUrl: authBackendUrl,
       coreKitInstance: instance,
     });
 
