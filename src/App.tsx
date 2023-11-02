@@ -4,6 +4,7 @@ import "./App.css";
 import * as Sentry from "@sentry/react";
 import type { SafeEventEmitterProvider } from "@web3auth/base";
 import {
+  AuthenticatorService,
   COREKIT_STATUS,
   FactorKeyTypeShareDescription,
   getWebBrowserFactor,
@@ -12,6 +13,7 @@ import {
   // mnemonicToKey,
   parseToken,
   Point,
+  SmsService,
   TssSecurityQuestion,
   TssShareType,
   WEB3AUTH_NETWORK,
@@ -24,9 +26,7 @@ import swal from "sweetalert";
 import Web3 from "web3";
 import type { provider } from "web3-core";
 
-import AuthenticatorService from "./authenticatorService";
 import Loading from "./Loading";
-import SmsPasswordless from "./smsService";
 import { generateIdToken } from "./utils";
 
 const uiConsole = (...args: any[]): void => {
@@ -76,7 +76,7 @@ function App() {
     const init = async () => {
       const coreKitInstance = new Web3AuthMPCCoreKit({
         web3AuthClientId: "torus-key-test",
-        web3AuthNetwork: WEB3AUTH_NETWORK.MAINNET,
+        web3AuthNetwork: WEB3AUTH_NETWORK.DEVNET,
         uxMode: "popup",
       });
       await coreKitInstance.init();
@@ -340,8 +340,12 @@ function App() {
         uiConsole("sms console already setup");
         return;
       }
+      const smsInstance = new SmsService({
+        backendUrl: "http://localhost:3021",
+        coreKitInstance,
+      });
 
-      const result = await SmsPasswordless.registerSmsOTP(privKey, number);
+      const result = await smsInstance.registerSmsOTP(privKey, number);
       uiConsole("please use this code to verify your phone number", result);
       console.log("otp code", result);
 
@@ -359,7 +363,7 @@ function App() {
       const { metadataPubKey: pubKey } = coreKitInstance.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const newBackUpFactorKey = new BN(generatePrivate());
-      await SmsPasswordless.addSmsRecovery(address, verificationCode, newBackUpFactorKey);
+      await smsInstance.addSmsRecovery(address, verificationCode, newBackUpFactorKey);
 
       // setup the sms recovery factor key and share in tkey.
       // for sms otp, we have set up a custom share/ factor with module type as "mobile_sms" defined in CustomFactorsModuleType.MOBILE_SMS in this example.
@@ -421,10 +425,15 @@ function App() {
       setIsLoading(true);
       console.log("sms recovery already setup", shareDescriptionsMobile);
 
+      const smsInstance = new SmsService({
+        backendUrl: "http://localhost:3021",
+        coreKitInstance,
+      });
+
       const { number } = shareDescriptionsMobile;
       const { pubKey } = coreKitInstance.tKey.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
-      const result = await SmsPasswordless.requestSMSOTP(address);
+      const result = await smsInstance.requestSMSOTP(address);
       uiConsole("please use this code to verify your phone number", number, "code", result);
       console.log("otp code", result);
 
@@ -439,7 +448,7 @@ function App() {
         uiConsole("Invalid verification code entered");
       }
 
-      const backupFactorKey = await SmsPasswordless.verifySMSOTPRecovery(address, verificationCode);
+      const backupFactorKey = await smsInstance.verifySMSOTPRecovery(address, verificationCode);
       if (!backupFactorKey) {
         throw new Error("Invalid verification code entered");
       }
@@ -462,6 +471,59 @@ function App() {
       }
     }
     setIsLoading(false);
+  };
+
+  const setupSMSRemoteClient = async (): Promise<void> => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance is not set");
+    }
+
+    if (coreKitInstance.status === COREKIT_STATUS.NOT_INITIALIZED) {
+      throw new Error("user is not logged in, ");
+    }
+    const instance = coreKitInstance;
+
+    const smsInstance = new SmsService({
+      backendUrl: "http://localhost:3021",
+      coreKitInstance: instance,
+    });
+
+    const description = smsInstance.getDescriptionsAndUpdate();
+    console.log(description);
+
+    if (description) {
+      // start sms
+      const { metadataPubKey } = instance.getKeyDetails();
+      const address = `${metadataPubKey.x.toString(16, 64)}${metadataPubKey.y.toString(16, 64)}`;
+      const result = await smsInstance.requestSMSOTP(address);
+
+      console.log(result);
+
+      uiConsole("please use this code to verify your phone number", number, "code", result);
+      console.log("otp code", result);
+
+      const verificationCode = await swal("Enter your backup share, please enter the correct code first time :)", {
+        content: "input" as any,
+      }).then((value) => {
+        return value;
+      });
+
+      if (!verificationCode || verificationCode.length !== 6) {
+        console.error("Invalid verification code entered");
+        uiConsole("Invalid verification code entered");
+      }
+
+      // verify sms
+      // let verifiedResult = await smsInstance.verifySMSOTPRemote(description.key, result!);
+      const verifiedResult = await smsInstance.verifyRemoteSetup(address, verificationCode);
+      await instance.setupRemoteClient(verifiedResult);
+      console.log(instance.status);
+      uiConsole("remote client setup complete");
+
+      if (instance.provider) setProvider(instance.provider);
+    } else {
+      uiConsole("sms recovery is not setup");
+    }
   };
 
   const setupAuthenticatorRecovery = async (): Promise<void> => {
@@ -488,8 +550,13 @@ function App() {
         return;
       }
 
-      const secretKey = AuthenticatorService.generateSecretKey();
-      await AuthenticatorService.register(privKey, secretKey);
+      const authenticatorInstance = new AuthenticatorService({
+        backendUrl: "http://localhost:3021",
+        coreKitInstance,
+      });
+
+      const secretKey = authenticatorInstance.generateSecretKey();
+      await authenticatorInstance.register(privKey, secretKey);
       uiConsole("please use this secret key to enter any authenticator app like google", secretKey);
       console.log("secret key", secretKey);
 
@@ -511,7 +578,7 @@ function App() {
       const { pubKey } = coreKitInstance.tKey.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const newBackUpFactorKey = new BN(generatePrivate());
-      await AuthenticatorService.addAuthenticatorRecovery(address, verificationCode, newBackUpFactorKey);
+      await authenticatorInstance.addAuthenticatorRecovery(address, verificationCode, newBackUpFactorKey);
 
       // setup the authenticator recovery factor key and share in tkey.
       // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
@@ -584,7 +651,11 @@ function App() {
       }
       setIsLoading(true);
 
-      const backupFactorKey = await AuthenticatorService.verifyAuthenticatorRecovery(address, verificationCode);
+      const authenticatorInstance = new AuthenticatorService({
+        backendUrl: "http://localhost:3021",
+        coreKitInstance,
+      });
+      const backupFactorKey = await authenticatorInstance.verifyAuthenticatorRecovery(address, verificationCode);
       if (!backupFactorKey) {
         throw new Error("Invalid verification code entered");
       }
@@ -606,6 +677,55 @@ function App() {
         Sentry.captureException(error);
         uiConsole(error as Error);
       }
+    }
+    setIsLoading(false);
+  };
+
+  const setupAuthenticatorRemoteClient = async (): Promise<void> => {
+    if (!coreKitInstance) {
+      throw new Error("coreKitInstance is not set");
+    }
+
+    if (coreKitInstance.status === COREKIT_STATUS.NOT_INITIALIZED) {
+      throw new Error("user is not logged in, ");
+    }
+    const instance = coreKitInstance;
+
+    const authenticatorInstance = new AuthenticatorService({
+      backendUrl: "http://localhost:3021",
+      coreKitInstance: instance,
+    });
+
+    const description = authenticatorInstance.getDescriptionsAndUpdate();
+    console.log(description);
+
+    if (description) {
+      // start sms
+      const { metadataPubKey } = instance.getKeyDetails();
+      const address = `${metadataPubKey.x.toString(16, 64)}${metadataPubKey.y.toString(16, 64)}`;
+
+      const verificationCode = await swal("Enter your authenticator code, please enter the correct code first time :)", {
+        content: "input" as any,
+      }).then((value) => {
+        return value;
+      });
+
+      if (!verificationCode) {
+        console.error("Invalid verification code entered");
+        uiConsole("Invalid verification code entered");
+        return;
+      }
+      setIsLoading(true);
+
+      // verify code
+      const verifiedResult = await authenticatorInstance.verifyRemoteSetup(address, verificationCode);
+      await instance.setupRemoteClient(verifiedResult);
+      console.log(instance.status);
+      uiConsole("remote client setup complete");
+
+      if (instance.provider) setProvider(instance.provider);
+    } else {
+      uiConsole("sms recovery is not setup");
     }
     setIsLoading(false);
   };
@@ -1010,6 +1130,15 @@ function App() {
           {/* <input value={answer} onChange={(e) => setAnswer(e.target.value)}></input> */}
           <button onClick={() => recoverSecurityQuestionFactor()} className="card">
             Recover Using Security Answer
+          </button>
+        </div>
+
+        <div>
+          <button onClick={setupSMSRemoteClient} className="card">
+            Setup SMS Recovery Remote Client
+          </button>
+          <button onClick={setupAuthenticatorRemoteClient} className="card">
+            Setup Authenticator Recovery Remote Client
           </button>
         </div>
 
