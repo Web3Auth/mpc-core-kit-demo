@@ -80,6 +80,8 @@ function App() {
         web3AuthClientId: "torus-key-test",
         web3AuthNetwork: WEB3AUTH_NETWORK.DEVNET,
         uxMode: "popup",
+        allowNoAuthorizationForRemoteClient: true,
+        // authorizationUrl: ["http://localhost:80/signature", "http://localhost:80/signature", "http://localhost:80/signature"],
       });
       await coreKitInstance.init();
       setCoreKitInstance(coreKitInstance);
@@ -553,7 +555,7 @@ function App() {
       }
 
       const authenticatorInstance = new AuthenticatorService({
-        backendUrl: smsBackendUrl,
+        backendUrl: authBackendUrl,
         coreKitInstance,
       });
 
