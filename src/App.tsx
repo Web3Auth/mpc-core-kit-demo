@@ -349,7 +349,7 @@ function App() {
         coreKitInstance,
       });
 
-      const result = await smsInstance.registerSmsOTP(privKey, number);
+      const result = await smsInstance.register(privKey, number);
       uiConsole("please use this code to verify your phone number", result);
       console.log("otp code", result);
 
@@ -437,7 +437,7 @@ function App() {
       const { number } = shareDescriptionsMobile;
       const { pubKey } = coreKitInstance.tKey.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
-      const result = await smsInstance.requestSMSOTP(address);
+      const result = await smsInstance.requestOTP(address);
       uiConsole("please use this code to verify your phone number", number, "code", result);
       console.log("otp code", result);
 
@@ -452,7 +452,7 @@ function App() {
         uiConsole("Invalid verification code entered");
       }
 
-      const backupFactorKey = await smsInstance.verifySMSOTPRecovery(address, verificationCode);
+      const backupFactorKey = await smsInstance.verifyRecovery(address, verificationCode);
       if (!backupFactorKey) {
         throw new Error("Invalid verification code entered");
       }
@@ -499,7 +499,7 @@ function App() {
       // start sms
       const { metadataPubKey } = instance.getKeyDetails();
       const address = `${metadataPubKey.x.toString(16, 64)}${metadataPubKey.y.toString(16, 64)}`;
-      const result = await smsInstance.requestSMSOTP(address);
+      const result = await smsInstance.requestOTP(address);
 
       console.log(result);
 
@@ -582,7 +582,7 @@ function App() {
       const { pubKey } = coreKitInstance.tKey.getKeyDetails();
       const address = `${pubKey.x.toString(16, 64)}${pubKey.y.toString(16, 64)}`;
       const newBackUpFactorKey = new BN(generatePrivate());
-      await authenticatorInstance.addAuthenticatorRecovery(address, verificationCode, newBackUpFactorKey);
+      await authenticatorInstance.addRecovery(address, verificationCode, newBackUpFactorKey);
 
       // setup the authenticator recovery factor key and share in tkey.
       // for authenticator, we have set up a custom share/ factor with module type as "authenticator" defined in CustomFactorsModuleType.AUTHENTICATOR in this example.
@@ -659,7 +659,7 @@ function App() {
         backendUrl: authBackendUrl,
         coreKitInstance,
       });
-      const backupFactorKey = await authenticatorInstance.verifyAuthenticatorRecovery(address, verificationCode);
+      const backupFactorKey = await authenticatorInstance.verifyRecovery(address, verificationCode);
       if (!backupFactorKey) {
         throw new Error("Invalid verification code entered");
       }
