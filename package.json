@@ -9,7 +9,7 @@
     "@sentry/react": "^7.59.2",
     "@toruslabs/http-helpers": "^4.0.0",
     "@toruslabs/loglevel-sentry": "^5.0.0",
-    "@web3auth/mpc-core-kit": "^1.1.2",
+    "@web3auth/mpc-core-kit": "Web3Auth/mpc-core-kit#demo/remote-signing",
     "authenticator": "^1.1.5",
     "bn.js": "^5.2.1",
     "copy-webpack-plugin": "^11.0.0",
@@ -44,7 +44,7 @@
   },
   "scripts": {
     "start": "react-app-rewired start",
-    "serve": "serve -s build",
+    "serve": "npx serve -s build",
     "build": "react-app-rewired build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject"
