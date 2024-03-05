@@ -8,6 +8,7 @@ import BN from "bn.js";
 import { generatePrivate } from "eccrypto";
 import { useEffect, useState } from "react";
 import swal from "sweetalert";
+import Swal from "sweetalert2";
 import Web3 from "web3";
 import type { provider } from "web3-core";
 
@@ -291,18 +292,20 @@ function App() {
         return;
       }
 
-      const secretKey = AuthenticatorService.generateSecretKey();
-      await AuthenticatorService.register(tkeyPrivKey, secretKey);
-      uiConsole("please use this secret key to enter any authenticator app like google", secretKey);
-      console.log("secret key", secretKey);
+      const result = await AuthenticatorService.register(tkeyPrivKey);
+      uiConsole("please use this secret key to enter any authenticator app like google", result.secret);
+      console.log("secret key", result.secret);
 
-      const verificationCode = await swal(
-        `Enter your authenticator code for this secret key: ${secretKey}, please enter the correct code first time :)`,
-        {
-          content: "input" as any,
-        }
-      ).then((value) => {
-        return value;
+      const verificationCode: string = await Swal.fire({
+        title: "Registered",
+        text: `Enter your authenticator code for this secret key: ${result.secret}, please enter the correct code first time :)`,
+        imageUrl: `${result.qrData}`,
+        imageWidth: 400,
+        imageHeight: 400,
+        imageAlt: "QR Registration Code",
+        input: "text",
+      }).then((result) => {
+        return result.value;
       });
 
       if (!verificationCode) {
