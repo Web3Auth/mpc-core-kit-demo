@@ -44,6 +44,33 @@ class AuthenticatorService {
     return resp;
   }
 
+  async deregister(privKey: BN): Promise<{ success: boolean; message: string }> {
+    const ec = getEcCrypto();
+    const privKeyPair: ec.KeyPair = ec.keyFromPrivate(privKey.toString(16, 64));
+    const pubKey = privKeyPair.getPublic();
+    const address = {
+      x: pubKey.getX().toString(16, 64),
+      y: pubKey.getY().toString(16, 64),
+    };
+    const sig = ec.sign(keccak256(Buffer.from(`${address.x}${address.y}`, "utf8")), Buffer.from(privKey.toString(16, 64), "hex"));
+
+    const data = {
+      pubKey: address,
+      sig: {
+        r: sig.r.toString(16, 64),
+        s: sig.s.toString(16, 64),
+        v: new BN(sig.recoveryParam as number).toString(16, 2),
+      },
+    };
+
+    const resp = await post<{
+      success: boolean;
+      message: string;
+    }>(`${this.authenticatorUrl}/authenticator/deregister`, data);
+
+    return resp;
+  }
+
   async addAuthenticatorRecovery(address: string, code: string, factorKey: BN) {
     if (!factorKey) throw new Error("factorKey is not defined");
     if (!address) throw new Error("address is not defined");

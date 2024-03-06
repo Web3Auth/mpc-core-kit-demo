@@ -329,6 +329,29 @@ function App() {
     }
   };
 
+  const shutdownAuthenticatorRecovery = async (): Promise<void> => {
+    try {
+      if (!coreKitInstance) {
+        throw new Error("coreKitInstance is not set");
+      }
+      if (!coreKitInstance.tkeyPrivKey) {
+        throw new Error("user is not logged in, tkey is not reconstructed yet.");
+      }
+
+      // get the tkey address
+      const { tkeyPrivKey } = coreKitInstance;
+
+      // todo remove custom share
+
+      const result = await AuthenticatorService.deregister(tkeyPrivKey);
+      uiConsole(result.message);
+    } catch (error: unknown) {
+      console.error(error);
+      Sentry.captureException(error);
+      uiConsole((error as Error).message);
+    }
+  };
+
   const recoverViaAuthenticatorApp = async (): Promise<void> => {
     try {
       if (!coreKitInstance) {
@@ -517,6 +540,9 @@ function App() {
         </button>
         <button onClick={setupAuthenticatorRecovery} className="card">
           Setup Authenticator
+        </button>
+        <button onClick={shutdownAuthenticatorRecovery} className="card">
+          Remove Authenticator
         </button>
       </div>
       <h2 className="subtitle">Blockchain Calls</h2>
