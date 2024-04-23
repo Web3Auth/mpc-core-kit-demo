@@ -6,7 +6,7 @@
   "eslint.format.enable": true,
   "eslint.lintTask.enable": true,
   "editor.codeActionsOnSave": {
-    "source.fixAll": "explicit"
+    "source.fixAll": true
   },
   "editor.tabSize": 2,
   "eslint.workingDirectories": [
@@ -24,3 +24,4 @@
     }
   ]
 }
+  
