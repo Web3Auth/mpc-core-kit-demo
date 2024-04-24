@@ -1,14 +1,12 @@
 import { post } from "@toruslabs/http-helpers";
-import authenticator from "authenticator";
 import BN from "bn.js";
 import type { ec } from "elliptic";
 import { keccak256 } from "ethereum-cryptography/keccak";
-import base32 from "hi-base32";
 
 import { getEcCrypto } from "./utils";
 
 class AuthenticatorService {
-  readonly authenticatorUrl: string = `${process.env.REACT_APP_BACKEND_ENDPOINT}/api/v1`;
+  readonly authenticatorUrl: string = `${process.env.REACT_APP_BACKEND_ENDPOINT}/api/v1`; // "http://localhost:3021/api/v1";
 
   constructor() {
     if (!process.env.REACT_APP_BACKEND_ENDPOINT) {
@@ -18,34 +16,57 @@ class AuthenticatorService {
     }
   }
 
-  generateSecretKey(): string {
-    const key = authenticator.generateKey();
-    return base32.encode(key).toString().replace(/=/g, "");
-  }
-
-  async register(privKey: BN, secretKey: string): Promise<{ success: boolean; message?: string }> {
+  async register(privKey: BN): Promise<{ success: boolean; qrData: string; secret: string }> {
     const ec = getEcCrypto();
     const privKeyPair: ec.KeyPair = ec.keyFromPrivate(privKey.toString(16, 64));
     const pubKey = privKeyPair.getPublic();
-    const sig = ec.sign(keccak256(Buffer.from(secretKey, "utf8")), Buffer.from(privKey.toString(16, 64), "hex"));
+    const address = {
+      x: pubKey.getX().toString(16, 64),
+      y: pubKey.getY().toString(16, 64),
+    };
+    const sig = ec.sign(keccak256(Buffer.from(`${address.x}${address.y}`, "utf8")), Buffer.from(privKey.toString(16, 64), "hex"));
 
     const data = {
-      pubKey: {
-        x: pubKey.getX().toString(16, 64),
-        y: pubKey.getY().toString(16, 64),
-      },
+      pubKey: address,
       sig: {
         r: sig.r.toString(16, 64),
         s: sig.s.toString(16, 64),
         v: new BN(sig.recoveryParam as number).toString(16, 2),
       },
-      secretKey,
+    };
+
+    const resp = await post<{
+      success: boolean;
+      qrData: string;
+      secret: string;
+    }>(`${this.authenticatorUrl}/authenticator/register`, data);
+
+    return resp;
+  }
+
+  async deregister(privKey: BN): Promise<{ success: boolean; message: string }> {
+    const ec = getEcCrypto();
+    const privKeyPair: ec.KeyPair = ec.keyFromPrivate(privKey.toString(16, 64));
+    const pubKey = privKeyPair.getPublic();
+    const address = {
+      x: pubKey.getX().toString(16, 64),
+      y: pubKey.getY().toString(16, 64),
+    };
+    const sig = ec.sign(keccak256(Buffer.from(`${address.x}${address.y}`, "utf8")), Buffer.from(privKey.toString(16, 64), "hex"));
+
+    const data = {
+      pubKey: address,
+      sig: {
+        r: sig.r.toString(16, 64),
+        s: sig.s.toString(16, 64),
+        v: new BN(sig.recoveryParam as number).toString(16, 2),
+      },
     };
 
     const resp = await post<{
       success: boolean;
       message: string;
-    }>(`${this.authenticatorUrl}/authenticator/register`, data);
+    }>(`${this.authenticatorUrl}/authenticator/deregister`, data);
 
     return resp;
   }
