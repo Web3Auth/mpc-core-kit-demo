@@ -23,7 +23,7 @@ npm run start
 
 ### Run Frontend with Local Docker Setup
 
-This setup and repo is private, [reach out to us](https://calendly.com/web3auth/meeting-with-web3auth) for access to the repo. 
+This setup and repo is private, [reach out to us](https://calendly.com/web3auth/meeting-with-web3auth) for access to the repo.
 
 Follow instructions on the backend repo before proceeding.
 
@@ -32,6 +32,18 @@ Rename .env.example.local to .env
 ```
 npm run start
 ```
+
+### To fix prettier problem
+
+Try running `npx prettier --write .` on your project's directory.
+
+### How to recover
+
+If you enabled MFA option after you logged in, you will need to proceed recovery logic to get your account back.
+There are couple of ways to recover the account.
+You can recover using any of the methods you used for setup.
+After successfully recover, factor Key will automatically loaded to the input field.
+Just press Input Factor Key to recover.
 
 ## Important Links
 
